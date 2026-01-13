@@ -78,7 +78,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     // 5. 카메라 컨트롤러 생성 (화질을 Medium으로 낮춰서 테스트 -> 안정성 확보)
     _controller = CameraController(
       cameras[0],
-      ResolutionPreset.medium, // High 대신 Medium으로 변경 (멈춤 방지)
+      ResolutionPreset.high, // High 대신 Medium으로 변경 (멈춤 방지)
       enableAudio: false,
       imageFormatGroup: ImageFormatGroup.bgra8888, // iOS 호환성 강화
     );
@@ -110,11 +110,24 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // 6. 화면 비율에 맞춰서 꽉 차게 보여주기
-    return SizedBox(
-      width: double.infinity,
-      height: double.infinity,
-      child: CameraPreview(_controller!),
+    // --- [이 부분을 수정합니다] ---
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          height: constraints.maxHeight,
+          child: FittedBox(
+            fit: BoxFit.cover, // 비율을 유지하면서 화면을 꽉 채움 (남는 부분은 자름)
+            child: SizedBox(
+              // 카메라 프리뷰의 실제 크기를 넘겨주어 FittedBox가 계산하게 함
+              width: _controller!.value.previewSize!.height,
+              height: _controller!.value.previewSize!.width,
+              child: CameraPreview(_controller!),
+            ),
+          ),
+        );
+      },
     );
+    // ----------------------------
   }
 }
