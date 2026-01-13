@@ -1,98 +1,177 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import '../controllers/global_controller.dart'; // 관제탑 불러오기
-import 'camera_view.dart'; 
+import '../controllers/global_controller.dart';
+import 'camera_view.dart';
 
-class HomeScreen extends StatelessWidget { // StatefulWidget일 필요 없음 (GetX 쓰니까)
+class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // 관제탑(Controller) 등록! 이제 어디서든 controller 변수로 접근 가능
     final controller = Get.put(GlobalController());
 
     return Scaffold(
+      backgroundColor: Colors.black, // 카메라 로딩 전 검은색
       body: Stack(
         children: [
-          // 1. 배경: 카메라
+          // [Layer 1] 배경: 카메라 (팀원 C 영역)
           const Positioned.fill(
             child: CameraView(),
           ),
 
-          // 2. 위험 감지 시 빨간 화면 깜빡임 (Obx로 감싸서 실시간 반응)
+          // [Layer 2] 시인성 강화 그라데이션 (위, 아래 어둡게)
+          Column(
+            children: [
+              Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.black.withOpacity(0.8), Colors.transparent],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Container(
+                height: 160,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.transparent, Colors.black.withOpacity(0.8)],
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                  ),
+                ),
+              ),
+            ],
+          ),
+
+          // [Layer 3] 위험 감지 시 화면 테두리 붉은 점멸 효과
           Obx(() => controller.isDanger.value
-              ? Container(
-                  color: Colors.red.withOpacity(0.5), // 위험할 때 빨간색 반투명
-                  width: double.infinity,
-                  height: double.infinity,
+              ? IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      border: Border.all(color: Colors.redAccent, width: 8),
+                      color: Colors.red.withOpacity(0.2),
+                    ),
+                  ),
                 )
-              : const SizedBox()), // 안전할 땐 아무것도 없음
+              : const SizedBox()),
 
-          // 3. UI 오버레이
+          // [Layer 4] HUD 정보 표시 (UI)
           SafeArea(
-            child: Column(
-              children: [
-                _buildTopBar(controller), // 컨트롤러를 넘겨줌
-                const Spacer(),
-                _buildBottomBar(controller),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 상단 헤더
+                  Row(
+                    children: [
+                      const Icon(Icons.electric_scooter, color: Colors.white, size: 28),
+                      const SizedBox(width: 8),
+                      const Text(
+                        "Safety Scooter",
+                        style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1.0),
+                      ),
+                      const Spacer(),
+                      // 배터리 아이콘 (데코레이션)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Row(
+                          children: [
+                            Icon(Icons.battery_std, color: Colors.greenAccent, size: 16),
+                            SizedBox(width: 4),
+                            Text("85%", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
+                  
+                  const Spacer(), // 중앙 비우기
+
+                  // 중앙 하단: 위험 경고 메시지 (조건부 표시)
+                  Obx(() => controller.isDanger.value
+                      ? Center(
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 20),
+                            padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFD32F2F), // 진한 빨강
+                              borderRadius: BorderRadius.circular(30),
+                              boxShadow: [
+                                BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 20, spreadRadius: 2)
+                              ],
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 30),
+                                SizedBox(width: 10),
+                                Text(
+                                  "위험 감지! 감속하세요",
+                                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                      : const SizedBox()),
+
+                  // 하단 대시보드 (속도계)
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.end,
+                    children: [
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("CURRENT SPEED", style: TextStyle(color: Colors.white54, fontSize: 12, letterSpacing: 2)),
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.baseline,
+                            textBaseline: TextBaseline.alphabetic,
+                            children: [
+                              Obx(() => Text(
+                                // "0.0 km/h"에서 숫자만 파싱
+                                controller.speed.value.split(' ')[0], 
+                                style: const TextStyle(
+                                  color: Colors.white, 
+                                  fontSize: 72, 
+                                  fontWeight: FontWeight.w900, 
+                                  height: 1.0,
+                                ),
+                              )),
+                              const SizedBox(width: 8),
+                              const Text("km/h", style: TextStyle(color: Colors.amber, fontSize: 20, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      
+                      // 시뮬레이션 버튼 (디자인에 통합)
+                      FloatingActionButton(
+                        onPressed: () {
+                          // 버튼 누르면 위험 상황 <-> 안전 상황 전환
+                          controller.setDangerStatus(!controller.isDanger.value);
+                          controller.updateSpeed(controller.isDanger.value ? 12.5 : 24.8);
+                        },
+                        backgroundColor: Colors.white12,
+                        elevation: 0,
+                        mini: true,
+                        child: const Icon(Icons.bug_report, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildTopBar(GlobalController controller) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // 속도계 (Obx로 감싸서 속도 바뀌면 숫자 바뀜)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.black54,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Obx(() => Text(
-              "🚀 ${controller.speed.value}", // 관제탑의 속도값 표시
-              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-            )),
-          ),
-          
-          // 상태 메시지
-          Obx(() => Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: controller.isDanger.value ? Colors.red : Colors.green,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Text(
-              controller.isDanger.value ? "⚠️ 위험 감지!" : "✅ 안전함",
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-            ),
-          )),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildBottomBar(GlobalController controller) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 30),
-      child: Center(
-        child: FloatingActionButton.extended(
-          onPressed: () {
-            // 테스트: 버튼 누르면 강제로 위험 상태 토글
-            controller.setDangerStatus(!controller.isDanger.value);
-            controller.updateSpeed(controller.isDanger.value ? 25.4 : 0.0);
-          },
-          label: const Text("시뮬레이션 테스트"),
-          icon: const Icon(Icons.bug_report),
-          backgroundColor: Colors.blueAccent,
-        ),
       ),
     );
   }
