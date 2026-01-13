@@ -66,8 +66,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 상단 헤더
-                  Row(
+                  Row( // 1. 여기서 const가 있었다면 반드시 삭제하세요!
                     children: [
                       const Icon(Icons.electric_scooter, color: Colors.white, size: 28),
                       const SizedBox(width: 8),
@@ -76,18 +75,22 @@ class HomeScreen extends StatelessWidget {
                         style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1.0),
                       ),
                       const Spacer(),
-                      // 배터리 아이콘 (데코레이션)
+                      // 배터리 아이콘
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
                           color: Colors.white24,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: const Row(
+                        child: Row( // 2. 여기 child 앞의 const도 삭제하세요!
                           children: [
-                            Icon(Icons.battery_std, color: Colors.greenAccent, size: 16),
-                            SizedBox(width: 4),
-                            Text("85%", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            const Icon(Icons.battery_std, color: Colors.greenAccent, size: 16),
+                            const SizedBox(width: 4),
+                            // 3. 고정된 "85%" 대신 아래 Obx 코드를 넣으세요.
+                            Obx(() => Text(
+                              "${controller.batteryLevel.value}%", 
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            )),
                           ],
                         ),
                       )
