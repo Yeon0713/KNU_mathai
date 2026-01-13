@@ -1,24 +1,26 @@
 import 'package:get/get.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:battery_plus/battery_plus.dart'; // 1. 패키지 추가 확인
+import 'package:battery_plus/battery_plus.dart';
+import '../utils/notification_helper.dart'; // <--- 1. 여기 경로가 실제 파일 위치와 맞는지 꼭 확인!
 
 class GlobalController extends GetxController {
-  // --- 공통 변수 ---
   var speed = "0.0 km/h".obs;
   var isDanger = false.obs;
 
-  // --- 배터리 관련 변수 추가 ---
   final Battery _battery = Battery();
   var batteryLevel = 100.obs;
+
+  // NotificationHelper 선언
+  final NotificationHelper _notification = NotificationHelper();
 
   @override
   void onInit() {
     super.onInit();
-    _startSpeedTracking(); // GPS 추적 시작
-    _initBatteryTracking(); // 배터리 추적 시작 (추가)
+    _notification.init(); // 초기화
+    _startSpeedTracking();
+    _initBatteryTracking();
   }
 
-  // 1. GPS 속도 추적 로직 (기존 유지)
   void _startSpeedTracking() async {
     LocationPermission permission = await Geolocator.checkPermission();
     if (permission == LocationPermission.denied) {
@@ -34,20 +36,17 @@ class GlobalController extends GetxController {
       double kmhSpeed = position.speed * 3.6;
       speed.value = "${kmhSpeed.toStringAsFixed(1)} km/h";
 
-      if (kmhSpeed > 20) {
+      if (kmhSpeed > 30) {
         isDanger.value = true;
+        _notification.triggerWarning(0.25); // 속도가 빠르면 소리 재생
       } else {
         isDanger.value = false;
       }
     });
   }
 
-  // 2. 배터리 추적 로직 (새로 추가)
   void _initBatteryTracking() async {
-    // 앱 시작 시 첫 배터리 수치 가져오기
     _updateBatteryLevel();
-
-    // 배터리 상태(충전 중/방전 중)가 바뀔 때마다 수치 갱신
     _battery.onBatteryStateChanged.listen((BatteryState state) {
       _updateBatteryLevel();
     });
@@ -58,7 +57,13 @@ class GlobalController extends GetxController {
     batteryLevel.value = level;
   }
 
-  // 기존 함수 유지
-  void setDangerStatus(bool status) => isDanger.value = status;
+  // 중복되지 않게 하나만 남겨둡니다.
+  void setDangerStatus(bool status) {
+    isDanger.value = status;
+    if (status) {
+      _notification.triggerWarning(0.25); // 버튼 눌러서 위험할 때 소리 재생
+    }
+  }
+
   void updateSpeed(double newSpeed) => speed.value = "$newSpeed km/h";
 }
