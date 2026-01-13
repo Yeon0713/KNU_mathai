@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:safety_scooter/screens/camera_view.dart';
 import '../controllers/global_controller.dart';
 import 'camera_view.dart';
 
@@ -15,7 +16,7 @@ class HomeScreen extends StatelessWidget {
       body: Stack(
         children: [
           // [Layer 1] 배경: 카메라 (팀원 C 영역)
-          const Positioned.fill(
+          Positioned.fill(
             child: CameraView(),
           ),
 
