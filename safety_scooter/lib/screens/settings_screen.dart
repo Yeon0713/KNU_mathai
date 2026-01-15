@@ -59,10 +59,9 @@ class SettingsScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               
-              // 설명 텍스트
-              const Text(
-                "값이 낮을수록(0.5) 더 민감하게 감지하고,\n값이 높을수록(1.0) 확실한 위험만 감지합니다.",
-                style: TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+              Text(
+                'sensitivity_info'.tr, 
+                style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
               ),
               const SizedBox(height: 20),
 
