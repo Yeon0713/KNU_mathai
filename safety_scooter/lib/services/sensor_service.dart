@@ -7,20 +7,23 @@ import 'package:permission_handler/permission_handler.dart';
 
 class SensorService extends GetxController {
   // ----------------------------------------------------------
-  // [관측 변수] UI에서 보여줄 값들
+  // [관측 변수] UI 및 GlobalController에서 구독할 값들
   // ----------------------------------------------------------
-  var displaySpeed = "정지".obs;     // UI에 표시될 텍스트 (예: "15 km/h" or "터널 주행 중")
-  var isMoving = false.obs;         // 움직이는지 여부 (AI 켜는 스위치)
-  var isDanger = false.obs;         // 위험 감지 여부
   
-  // 디버깅용 (실제 값 확인)
-  var rawGpsSpeed = 0.0.obs;        // 실제 GPS 속도
-  var rawVibration = 0.0.obs;       // 실제 진동 세기
+  // ★ 수정됨: 이제 "정지" 같은 한글 없이 무조건 "0.0 km/h" 형식만 유지
+  var displaySpeed = "0.0 km/h".obs;     
+  
+  // AI 작동 여부를 결정하는 핵심 스위치
+  var isMoving = false.obs;         
+  
+  // 디버깅용
+  var rawGpsSpeed = 0.0.obs;        
+  var rawVibration = 0.0.obs;       
 
   // ----------------------------------------------------------
-  // [설정값] 튜닝 포인트
+  // [튜닝 포인트]
   // ----------------------------------------------------------
-  final double GPS_MOVE_THRESHOLD = 3.0; // 3km/h 이상이면 무조건 주행으로 간주
+  final double GPS_MOVE_THRESHOLD = 3.0; // 3km/h 이상이면 확실히 주행 중
   final double VIBE_THRESHOLD = 1.5;     // 진동 임계값
   
   StreamSubscription? _accelSubscription;
@@ -30,7 +33,7 @@ class SensorService extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initializeSensors(); // 앱 켜지자마자 센서 가동
+    _initializeSensors(); 
   }
 
   @override
@@ -41,82 +44,75 @@ class SensorService extends GetxController {
     super.onClose();
   }
 
-  // ----------------------------------------------------------
-  // [초기화] 권한 받고 센서 2개 동시에 켜기
-  // ----------------------------------------------------------
   Future<void> _initializeSensors() async {
-    // 1. 위치 권한 요청 (GPS 쓰려면 필수)
     var status = await Permission.location.request();
     if (status.isGranted) {
       _startGps();
     }
-    
-    // 2. 가속도 센서 시작
     _startAccelerometer();
   }
 
   // ----------------------------------------------------------
-  // [로직 1] GPS: "속도가 찍히면 무조건 주행 중!"
+  // [로직 1] GPS: 항상 속도값을 업데이트함
   // ----------------------------------------------------------
   void _startGps() {
-    // 정확도 높음, 2미터마다 갱신
-    final locationSettings = LocationSettings(accuracy: LocationAccuracy.high, distanceFilter: 2);
+    final locationSettings = LocationSettings(
+      accuracy: LocationAccuracy.high, 
+      distanceFilter: 2
+    );
     
     _gpsSubscription = Geolocator.getPositionStream(locationSettings: locationSettings)
         .listen((Position position) {
       
-      // m/s -> km/h 변환
       double speedKmph = position.speed * 3.6;
-      if (speedKmph < 0) speedKmph = 0; // 음수 방지
+      if (speedKmph < 0) speedKmph = 0; 
 
-      rawGpsSpeed.value = speedKmph; // 값 저장
+      rawGpsSpeed.value = speedKmph;
 
-      // ★ 로직: 속도가 3km/h 넘으면 확실히 움직이는 거임
+      // ★ [수정] 조건문 밖에서도 항상 화면에 속도 표시 (0.0 km/h 포함)
+      displaySpeed.value = "${speedKmph.toStringAsFixed(1)} km/h";
+
+      // 로직: 속도가 임계값 넘으면 주행 상태로 변경
       if (speedKmph >= GPS_MOVE_THRESHOLD) {
         isMoving.value = true;
-        _stopTimer?.cancel(); // 정지 타이머 취소
-        
-        // UI 업데이트: 정확한 속도 표시
-        displaySpeed.value = "${speedKmph.toStringAsFixed(1)} km/h";
+        _stopTimer?.cancel(); 
       }
     });
   }
 
   // ----------------------------------------------------------
-  // [로직 2] 가속도 센서: "GPS가 안 터져도 진동 있으면 주행 중!" (터널/실내용)
+  // [로직 2] 가속도 센서: 화면 글자는 안 바꾸고, 내부 상태(isMoving)만 변경
   // ----------------------------------------------------------
   void _startAccelerometer() {
     _accelSubscription = userAccelerometerEventStream().listen((UserAccelerometerEvent event) {
       double force = sqrt(pow(event.x, 2) + pow(event.y, 2) + pow(event.z, 2));
       rawVibration.value = force;
 
-      // ★ 로직: GPS 속도가 안 잡혀도(0이어도), 진동이 심하면 움직이는 거임
+      // 로직: 진동이 임계값을 넘으면 움직이는 것으로 간주
       if (force > VIBE_THRESHOLD) {
-        // 이미 GPS로 주행 중이라고 판단했으면 굳이 건드리지 않음
+        
+        // GPS가 멈춰있다고 생각하는데 진동이 있을 때 (터널 등)
         if (rawGpsSpeed.value < GPS_MOVE_THRESHOLD) {
            isMoving.value = true;
            _stopTimer?.cancel();
            
-           // UI 업데이트: 속도는 모르지만 움직인다고 표시
-           displaySpeed.value = "🛴 주행 중 (GPS 약함)";
+           // ★ [수정] 여기서 "주행 중(GPS 약함)"이라고 글자를 바꾸지 않음.
+           // 화면에는 그냥 GPS가 주는 0.0 km/h가 찍혀있겠지만,
+           // isMoving은 true가 되었으므로 AI는 정상 작동함.
         }
 
-        // 진동이 멈추면 3초 뒤에 정지로 판단 (신호 대기 고려)
+        // 진동 멈춤 감지 타이머
         _stopTimer?.cancel();
         _stopTimer = Timer(const Duration(seconds: 3), () {
-          // 3초 뒤에도 GPS 속도가 0이면 진짜 멈춘 것
+          // 3초 뒤에도 GPS 속도가 없으면 진짜 멈춘 것
           if (rawGpsSpeed.value < GPS_MOVE_THRESHOLD) {
             isMoving.value = false;
-            displaySpeed.value = "정지";
+            
+            // ★ [수정] "정지" 대신 숫자로 초기화
+            displaySpeed.value = "0.0 km/h";
           }
         });
       }
     });
   }
-
-  // (외부용) 위험 상태 변경
-  void setDangerStatus(bool status) {
-    isDanger.value = status;
-  }
 }
-// git update test

@@ -3,6 +3,7 @@ import 'package:get/get.dart';
 import 'package:safety_scooter/screens/camera_view.dart';
 import '../controllers/global_controller.dart';
 import 'camera_view.dart';
+import 'settings_screen.dart'; // <--- 이 줄을 추가하세요!
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -174,14 +175,13 @@ class HomeScreen extends StatelessWidget {
                       // 시뮬레이션 버튼 (디자인에 통합)
                       FloatingActionButton(
                         onPressed: () {
-                          // 버튼 누르면 위험 상황 <-> 안전 상황 전환
-                          controller.setDangerStatus(!controller.isDanger.value);
-                          controller.updateSpeed(controller.isDanger.value ? 12.5 : 24.8);
+                          // 설정 화면으로 이동
+                          Get.to(() => const SettingsScreen());
                         },
-                        backgroundColor: Colors.white12,
-                        elevation: 0,
-                        mini: true,
-                        child: const Icon(Icons.bug_report, color: Colors.white70),
+                        backgroundColor: Colors.grey[800], // 버튼 색상을 조금 더 잘 보이게 변경
+                        elevation: 2, // 그림자 추가
+                        mini: false,  // 버튼 크기를 일반 크기로 키움 (누르기 편하게)
+                        child: const Icon(Icons.settings, color: Colors.white), // 톱니바퀴 아이콘
                       ),
                     ],
                   ),

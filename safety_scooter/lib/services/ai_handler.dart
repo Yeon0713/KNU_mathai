@@ -1,25 +1,22 @@
 import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
+import 'package:get/get.dart'; 
+import '../controllers/settings_controller.dart'; 
 
 class AiHandler {
-  // FlutterVision 인스턴스 생성
   late FlutterVision _vision;
-  
-  // 모델이 로드되었는지 확인하는 플래그
   bool isLoaded = false;
 
   AiHandler() {
     _vision = FlutterVision();
   }
 
-  // 1. 모델 로드 함수 (앱 시작할 때 한 번만 호출)
   Future<void> loadYoloModel() async {
     try {
       await _vision.loadYoloModel(
-        modelPath: 'assets/models/model.tflite', // 본인 파일명
-        labels: 'assets/models/labels.txt',             // 본인 파일명
+        modelPath: 'assets/models/model.tflite', 
+        labels: 'assets/models/labels.txt',             
         modelVersion: "yolov8", 
-        // quantized: false,  <-- 이 줄을 지우세요! (최신 버전에서 자동 처리됨)
         numThreads: 2,
         useGpu: true,
       );
@@ -30,31 +27,41 @@ class AiHandler {
     }
   }
 
-  // 2. 추론(Inference) 함수 (카메라 프레임마다 호출)
-  // 카메라에서 넘어오는 CameraImage 데이터를 받아서 분석 결과를 반환함
   Future<List<Map<String, dynamic>>> runInference(CameraImage cameraImage) async {
     if (!isLoaded) return [];
 
+    // 1. 설정값 가져오기 (없으면 기본값 0.5)
+    double myThreshold = 0.5; 
+    if (Get.isRegistered<SettingsController>()) {
+      myThreshold = Get.find<SettingsController>().confThreshold.value;
+    }
+
     try {
-      // yoloOnFrame 함수가 이미지 데이터를 받아 분석을 수행
+      // 2. AI 추론 실행
       final results = await _vision.yoloOnFrame(
         bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
         imageHeight: cameraImage.height,
         imageWidth: cameraImage.width,
-        // 아래 설정은 필요에 따라 조절 (민감도 등)
-        iouThreshold: 0.4, // 박스 겹침 허용도 (0.4 ~ 0.5)
-        confThreshold: 0.1, // 확신도 (0.4 이상인 것만 탐지)
+        iouThreshold: 0.4, 
+        confThreshold: 0.2, // 라이브러리에는 일단 낮게 줍니다 (우리가 직접 거를 거니까)
         classThreshold: 0.2,
       );
       
-      return results;
+      // 3. ★ [강제 필터링] 여기서 직접 쳐냅니다!
+      // 결과 리스트에서 "정확도가 설정값(myThreshold)보다 낮은 놈"은 다 지워버림
+      final filteredResults = results.where((result) {
+        double confidence = result['box'][4]; // 박스의 5번째 값이 정확도(0.0~1.0)
+        return confidence >= myThreshold;
+      }).toList();
+
+      return filteredResults;
+      
     } catch (e) {
-      print("⚠️ 추론 중 에러 발생: $e");
+      print("AI 에러: $e");
       return [];
     }
   }
 
-  // 3. 자원 해제 (앱 종료 시 호출)
   Future<void> closeModel() async {
     await _vision.closeYoloModel();
     isLoaded = false;
