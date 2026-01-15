@@ -13,4 +13,8 @@ if os.path.exists(model_path):
     
     print("\n✅ 그래프 생성 완료! 'runs/detect/val' 폴더를 확인해보세요.")
 else:
+<<<<<<< HEAD
     print(f"❌ 모델 파일이 없습니다: {model_path}")
+=======
+    print(f"❌ 모델 파일이 없습니다: {model_path}"
+>>>>>>> origin/main

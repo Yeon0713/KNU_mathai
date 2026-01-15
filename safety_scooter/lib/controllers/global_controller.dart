@@ -3,7 +3,7 @@ import 'package:get/get.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../utils/notification_helper.dart';
 import '../services/ai_handler.dart';
-import '../services/sensor_service.dart'; // SensorService import 필수!
+import '../services/sensor_service.dart'; 
 
 class GlobalController extends GetxController {
   // --------------------------------------------------------
@@ -12,10 +12,9 @@ class GlobalController extends GetxController {
   var speed = "0.0 km/h".obs;
   var batteryLevel = 100.obs;
   
-  // 최종 위험 상태 (UI는 이것만 바라봅니다)
+  
   var isDanger = false.obs; 
 
-  // ★ [에러 해결] 누락되었던 변수 선언 추가!
   bool _isSpeeding = false;       // 속도 위반 여부 상태
   bool _isObjectDetected = false; // 위험 객체 발견 여부 상태
 
@@ -26,7 +25,7 @@ class GlobalController extends GetxController {
   final NotificationHelper _notification = NotificationHelper();
   late AiHandler aiHandler;
   
-  // SensorService 연결 (속도 정보 가져오기 위함)
+  
   final SensorService sensorService = Get.put(SensorService()); 
 
   var yoloResults = <Map<String, dynamic>>[].obs;
@@ -49,7 +48,7 @@ class GlobalController extends GetxController {
 
     _initBatteryTracking();
     
-    // [중요] SensorService의 속도/움직임 상태를 감시합니다.
+    // SensorService의 속도/움직임 상태를 감시
     ever(sensorService.displaySpeed, (String val) {
       speed.value = val;
       
@@ -116,7 +115,7 @@ class GlobalController extends GetxController {
         for (var obj in results) {
           String tag = obj['tag']; 
           
-          // ★ labels.txt의 이름 "DANGER_HIT"와 정확히 일치해야 함
+          
           if (tag == "DANGER_HIT") {
             dangerFoundThisFrame = true;
             print("🚨 위험 요소(DANGER_HIT) 감지됨!");

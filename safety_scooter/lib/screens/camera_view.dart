@@ -36,7 +36,6 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // 4. 앱이 백그라운드로 갔다가 돌아올 때 카메라 재실행 (중요!)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final CameraController? cameraController = _controller;

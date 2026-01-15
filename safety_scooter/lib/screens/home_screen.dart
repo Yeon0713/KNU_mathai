@@ -16,7 +16,7 @@ class HomeScreen extends StatelessWidget {
       backgroundColor: Colors.black, // 카메라 로딩 전 검은색
       body: Stack(
         children: [
-          // [Layer 1] 배경: 카메라 (팀원 C 영역)
+          // [Layer 1] 배경: 카메라 
           Positioned.fill(
             child: CameraView(),
           ),
@@ -81,7 +81,7 @@ class HomeScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row( // 1. 여기서 const가 있었다면 반드시 삭제하세요!
+                  Row( 
                     children: [
                       const Icon(Icons.electric_scooter, color: Colors.white, size: 28),
                       const SizedBox(width: 8),
@@ -97,11 +97,11 @@ class HomeScreen extends StatelessWidget {
                           color: Colors.white24,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row( // 2. 여기 child 앞의 const도 삭제하세요!
+                        child: Row( 
                           children: [
                             const Icon(Icons.battery_std, color: Colors.greenAccent, size: 16),
                             const SizedBox(width: 4),
-                            // 3. 고정된 "85%" 대신 아래 Obx 코드를 넣으세요.
+                            
                             Obx(() => Text(
                               "${controller.batteryLevel.value}%", 
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
@@ -112,7 +112,7 @@ class HomeScreen extends StatelessWidget {
                     ],
                   ),
                   
-                  const Spacer(), // 중앙 비우기
+                  const Spacer(), 
 
                   // 중앙 하단: 위험 경고 메시지 (조건부 표시)
                   Obx(() => controller.isDanger.value
@@ -121,7 +121,7 @@ class HomeScreen extends StatelessWidget {
                             margin: const EdgeInsets.only(bottom: 20),
                             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD32F2F), // 진한 빨강
+                              color: const Color(0xFFD32F2F),
                               borderRadius: BorderRadius.circular(30),
                               boxShadow: [
                                 BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 20, spreadRadius: 2)
@@ -202,8 +202,8 @@ class HomeScreen extends StatelessWidget {
 
     // 2. 화면 비율과 이미지 비율 계산 (좌표 밀림 방지)
     // 안드로이드는 이미지가 90도 돌아가 있으므로 Width/Height를 바꿔서 생각해야 함
-    double imgH = controller.camImageHeight.value; // ex) 640 (화면 가로에 대응)
-    double imgW = controller.camImageWidth.value;  // ex) 480 (화면 세로에 대응)
+    double imgH = controller.camImageHeight.value; 
+    double imgW = controller.camImageWidth.value;  
 
     // 화면이 이미지를 꽉 채울 때(BoxFit.cover)의 스케일과 오차(Offset) 계산
     double screenRatio = screen.width / screen.height;
@@ -212,14 +212,13 @@ class HomeScreen extends StatelessWidget {
     double scale, offsetX, offsetY;
 
     if (screenRatio > imageRatio) {
-      // 화면이 더 납작함 -> 가로를 맞추고 세로가 잘림
       scale = screen.width / imgH;
       offsetX = 0;
       offsetY = (screen.height - (imgW * scale)) / 2; 
     } else {
-      // 화면이 더 길쭉함 (대부분의 최신 폰) -> 세로를 맞추고 가로가 잘림
+
       scale = screen.height / imgW;
-      offsetX = (screen.width - (imgH * scale)) / 2; // 가로 중앙 정렬 보정값
+      offsetX = (screen.width - (imgH * scale)) / 2; 
       offsetY = 0;
     }
 
