@@ -42,6 +42,7 @@ dependencies:
   get: ^4.7.3
   audioplayers: ^6.5.1
   battery_plus: ^7.0.0
+  flutter_vision: ^2.0.0
 
 dev_dependencies:
   flutter_test:
@@ -68,6 +69,8 @@ flutter:
   assets:
     - assets/sounds/level1.mp3
     - assets/sounds/level2.mp3
+    - assets/models/labels.txt
+    - assets/models/model.tflite
 
   # To add assets to your application, add an assets section, like this:
   # assets:

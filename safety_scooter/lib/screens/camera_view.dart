@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:get/get.dart';
 import '../main.dart'; // main.dart의 cameras 변수 사용
+import '../controllers/global_controller.dart';
 
 class CameraView extends StatefulWidget {
   const CameraView({super.key});
@@ -14,6 +16,8 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   CameraController? _controller;
   bool _isCameraInitialized = false;
   String _errorMessage = "";
+
+  final GlobalController globalController = Get.find<GlobalController>();
 
   @override
   void initState() {
@@ -80,11 +84,21 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       cameras[0],
       ResolutionPreset.high, // High 대신 Medium으로 변경 (멈춤 방지)
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.bgra8888, // iOS 호환성 강화
+
+      // 최대 호환성
+      imageFormatGroup: ImageFormatGroup.yuv420,
+      // iOS 호환성 강화
+      // imageFormatGroup: ImageFormatGroup.bgra8888, 
     );
 
     try {
       await _controller!.initialize();
+
+      _controller!.startImageStream((image) {
+        // print("📸 카메라 이미지 수신 중... (${image.width}x${image.height})");
+        globalController.processCameraImage(image);
+      });
+
       if (!mounted) return;
       setState(() {
         _isCameraInitialized = true;

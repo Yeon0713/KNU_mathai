@@ -20,6 +20,20 @@ class HomeScreen extends StatelessWidget {
             child: CameraView(),
           ),
 
+          // [Layer 1.5] YOLO Bounding Boxes (AI 인식 박스 그리기)
+          // Controller의 yoloResults가 변할 때마다 화면을 다시 그림
+          Obx(() {
+            if (controller.yoloResults.isEmpty) return const SizedBox();
+            
+            // 화면 크기 가져오기
+            final Size screenSize = MediaQuery.of(context).size;
+            
+            // 박스 그리기 함수 호출
+            return Stack(
+              children: _renderBoxes(controller, screenSize),
+            );
+          }),
+
           // [Layer 2] 시인성 강화 그라데이션 (위, 아래 어둡게)
           Column(
             children: [
@@ -178,5 +192,53 @@ class HomeScreen extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  // [이 함수를 build 함수 밑, class HomeScreen 닫는 괄호 위로 넣어주세요]
+  List<Widget> _renderBoxes(GlobalController controller, Size screen) {
+    // 1. 카메라 이미지 크기가 아직 없으면 빈 리스트 반환
+    if (controller.camImageHeight.value == 0 || controller.camImageWidth.value == 0) {
+      return [];
+    }
+
+    // 2. 화면과 이미지 비율 계산 (안드로이드는 이미지가 90도 회전되어 있어서 가로/세로를 바꿔서 계산해야 함)
+    // S24 울트라(세로 모드) 기준:
+    // 화면의 가로(Width)는 이미지의 세로(Height)에 대응
+    // 화면의 세로(Height)는 이미지의 가로(Width)에 대응
+    double factorX = screen.width / controller.camImageHeight.value; 
+    double factorY = screen.height / controller.camImageWidth.value;
+
+    return controller.yoloResults.map((result) {
+      final box = result["box"]; // [x1, y1, x2, y2, confidence]
+      final String tag = result["tag"];
+      final double confidence = (box[4] * 100);
+
+      // 위험 객체(Person, Pothole)는 빨간색, 나머지는 초록색
+      Color boxColor = (tag == "Person" || tag == "Pothole on road") ? Colors.redAccent : Colors.greenAccent;
+
+      return Positioned(
+        left: box[0] * factorX,
+        top: box[1] * factorY,
+        width: (box[2] - box[0]) * factorX,
+        height: (box[3] - box[1]) * factorY,
+        child: Container(
+          decoration: BoxDecoration(
+            border: Border.all(color: boxColor, width: 2.5),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: Container(
+              color: boxColor.withOpacity(0.8),
+              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+              child: Text(
+                "$tag ${confidence.toStringAsFixed(0)}%",
+                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ),
+        ),
+      );
+    }).toList();
   }
 }
