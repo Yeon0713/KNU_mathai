@@ -56,7 +56,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
 
   Future<void> _initializeCamera() async {
     // -----------------------------------------------------
-    // 권한 체크 로직 추가됨
+    // ★ 권한 체크 로직 추가됨
     // -----------------------------------------------------
     var status = await Permission.camera.request();
     
