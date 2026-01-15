@@ -5,7 +5,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class GlobalController extends GetxController {
+class SensorService extends GetxController {
   // ----------------------------------------------------------
   // [관측 변수] UI에서 보여줄 값들
   // ----------------------------------------------------------
@@ -90,7 +90,7 @@ class GlobalController extends GetxController {
       double force = sqrt(pow(event.x, 2) + pow(event.y, 2) + pow(event.z, 2));
       rawVibration.value = force;
 
-      // ★ 로직: GPS 속도가 안 잡혀도(0이어도), 진동이 심하면 움직이는 거임
+      
       if (force > VIBE_THRESHOLD) {
         // 이미 GPS로 주행 중이라고 판단했으면 굳이 건드리지 않음
         if (rawGpsSpeed.value < GPS_MOVE_THRESHOLD) {
@@ -114,9 +114,8 @@ class GlobalController extends GetxController {
     });
   }
 
-  // (외부용) 위험 상태 변경
+
   void setDangerStatus(bool status) {
     isDanger.value = status;
   }
 }
-// git update test

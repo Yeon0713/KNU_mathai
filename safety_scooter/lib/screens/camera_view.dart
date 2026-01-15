@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
+import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart'; // ★ 패키지 추가됨
 import '../main.dart'; // main.dart의 cameras 변수 사용
+import '../controllers/global_controller.dart';
 
 class CameraView extends StatefulWidget {
   const CameraView({super.key});
@@ -14,6 +17,8 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   CameraController? _controller;
   bool _isCameraInitialized = false;
   String _errorMessage = "";
+
+  final GlobalController globalController = Get.find<GlobalController>();
 
   @override
   void initState() {
@@ -31,7 +36,6 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
     super.dispose();
   }
 
-  // 4. 앱이 백그라운드로 갔다가 돌아올 때 카메라 재실행 (중요!)
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     final CameraController? cameraController = _controller;
@@ -51,6 +55,20 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   }
 
   Future<void> _initializeCamera() async {
+    // -----------------------------------------------------
+    // 권한 체크 로직 추가됨
+    // -----------------------------------------------------
+    var status = await Permission.camera.request();
+    
+    if (status.isDenied || status.isPermanentlyDenied) {
+      if (mounted) {
+        setState(() => _errorMessage = "카메라 권한이 거부되었습니다.\n설정에서 권한을 허용해주세요.");
+      }
+      openAppSettings(); // 설정창 열기
+      return;
+    }
+    // -----------------------------------------------------
+
     // 카메라 목록 안전장치
     if (cameras.isEmpty) {
       try {
@@ -75,16 +93,21 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       await _controller!.dispose();
     }
 
-    // 5. 카메라 컨트롤러 생성 (화질을 Medium으로 낮춰서 테스트 -> 안정성 확보)
+    // 5. 카메라 컨트롤러 생성
     _controller = CameraController(
       cameras[0],
-      ResolutionPreset.high, // High 대신 Medium으로 변경 (멈춤 방지)
+      ResolutionPreset.high, 
       enableAudio: false,
-      imageFormatGroup: ImageFormatGroup.bgra8888, // iOS 호환성 강화
+      imageFormatGroup: ImageFormatGroup.yuv420,
     );
 
     try {
       await _controller!.initialize();
+
+      _controller!.startImageStream((image) {
+        globalController.processCameraImage(image);
+      });
+
       if (!mounted) return;
       setState(() {
         _isCameraInitialized = true;
@@ -103,23 +126,23 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     if (_errorMessage.isNotEmpty) {
       return Center(
-          child: Text(_errorMessage, style: const TextStyle(color: Colors.red)));
+          child: Text(_errorMessage, 
+              textAlign: TextAlign.center,
+              style: const TextStyle(color: Colors.red)));
     }
 
     if (!_isCameraInitialized || _controller == null) {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // --- [이 부분을 수정합니다] ---
     return LayoutBuilder(
       builder: (context, constraints) {
         return SizedBox(
           width: constraints.maxWidth,
           height: constraints.maxHeight,
           child: FittedBox(
-            fit: BoxFit.cover, // 비율을 유지하면서 화면을 꽉 채움 (남는 부분은 자름)
+            fit: BoxFit.cover, 
             child: SizedBox(
-              // 카메라 프리뷰의 실제 크기를 넘겨주어 FittedBox가 계산하게 함
               width: _controller!.value.previewSize!.height,
               height: _controller!.value.previewSize!.width,
               child: CameraPreview(_controller!),
@@ -128,6 +151,5 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
         );
       },
     );
-    // ----------------------------
   }
 }
