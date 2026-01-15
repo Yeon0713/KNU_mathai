@@ -194,33 +194,67 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
-  // [이 함수를 build 함수 밑, class HomeScreen 닫는 괄호 위로 넣어주세요]
   List<Widget> _renderBoxes(GlobalController controller, Size screen) {
     // 1. 카메라 이미지 크기가 아직 없으면 빈 리스트 반환
     if (controller.camImageHeight.value == 0 || controller.camImageWidth.value == 0) {
       return [];
     }
 
-    // 2. 화면과 이미지 비율 계산 (안드로이드는 이미지가 90도 회전되어 있어서 가로/세로를 바꿔서 계산해야 함)
-    // S24 울트라(세로 모드) 기준:
-    // 화면의 가로(Width)는 이미지의 세로(Height)에 대응
-    // 화면의 세로(Height)는 이미지의 가로(Width)에 대응
-    double factorX = screen.width / controller.camImageHeight.value; 
-    double factorY = screen.height / controller.camImageWidth.value;
+    // 2. 화면 비율과 이미지 비율 계산 (좌표 밀림 방지)
+    // 안드로이드는 이미지가 90도 돌아가 있으므로 Width/Height를 바꿔서 생각해야 함
+    double imgH = controller.camImageHeight.value; // ex) 640 (화면 가로에 대응)
+    double imgW = controller.camImageWidth.value;  // ex) 480 (화면 세로에 대응)
+
+    // 화면이 이미지를 꽉 채울 때(BoxFit.cover)의 스케일과 오차(Offset) 계산
+    double screenRatio = screen.width / screen.height;
+    double imageRatio = imgH / imgW; 
+
+    double scale, offsetX, offsetY;
+
+    if (screenRatio > imageRatio) {
+      // 화면이 더 납작함 -> 가로를 맞추고 세로가 잘림
+      scale = screen.width / imgH;
+      offsetX = 0;
+      offsetY = (screen.height - (imgW * scale)) / 2; 
+    } else {
+      // 화면이 더 길쭉함 (대부분의 최신 폰) -> 세로를 맞추고 가로가 잘림
+      scale = screen.height / imgW;
+      offsetX = (screen.width - (imgH * scale)) / 2; // 가로 중앙 정렬 보정값
+      offsetY = 0;
+    }
 
     return controller.yoloResults.map((result) {
       final box = result["box"]; // [x1, y1, x2, y2, confidence]
       final String tag = result["tag"];
       final double confidence = (box[4] * 100);
 
-      // 위험 객체(Person, Pothole)는 빨간색, 나머지는 초록색
-      Color boxColor = (tag == "Person" || tag == "Pothole on road") ? Colors.redAccent : Colors.greenAccent;
+      // -----------------------------------------------------------
+      // [핵심 수정 1] 라벨 이름 변경 (labels.txt 기준)
+      // DANGER_HIT -> 빨간색 (위험)
+      // 그 외 -> 초록색 (안전/기타)
+      // -----------------------------------------------------------
+      Color boxColor;
+      if (tag == "DANGER_HIT") {
+        boxColor = Colors.redAccent;
+      } else if (tag == "CAUTION_OBJ") {
+        boxColor = Colors.amber;
+      } else {
+        boxColor = Colors.greenAccent;
+      }
+
+      // -----------------------------------------------------------
+      // [핵심 수정 2] 좌표 변환 (Scale + Offset)
+      // -----------------------------------------------------------
+      double left = box[0] * scale + offsetX;
+      double top = box[1] * scale + offsetY;
+      double width = (box[2] - box[0]) * scale;
+      double height = (box[3] - box[1]) * scale;
 
       return Positioned(
-        left: box[0] * factorX,
-        top: box[1] * factorY,
-        width: (box[2] - box[0]) * factorX,
-        height: (box[3] - box[1]) * factorY,
+        left: left,
+        top: top,
+        width: width,
+        height: height,
         child: Container(
           decoration: BoxDecoration(
             border: Border.all(color: boxColor, width: 2.5),
@@ -232,8 +266,12 @@ class HomeScreen extends StatelessWidget {
               color: boxColor.withOpacity(0.8),
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Text(
+                // 태그 이름과 정확도 표시
                 "$tag ${confidence.toStringAsFixed(0)}%",
-                style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                    color: Colors.white, 
+                    fontSize: 10, 
+                    fontWeight: FontWeight.bold),
               ),
             ),
           ),

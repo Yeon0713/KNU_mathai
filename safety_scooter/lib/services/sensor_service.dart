@@ -5,7 +5,7 @@ import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-class GlobalController extends GetxController {
+class SensorService extends GetxController {
   // ----------------------------------------------------------
   // [관측 변수] UI에서 보여줄 값들
   // ----------------------------------------------------------

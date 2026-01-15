@@ -43,7 +43,7 @@ class AiHandler {
         imageWidth: cameraImage.width,
         // 아래 설정은 필요에 따라 조절 (민감도 등)
         iouThreshold: 0.4, // 박스 겹침 허용도 (0.4 ~ 0.5)
-        confThreshold: 0.2, // 확신도 (0.4 이상인 것만 탐지)
+        confThreshold: 0.1, // 확신도 (0.4 이상인 것만 탐지)
         classThreshold: 0.2,
       );
       
