@@ -212,7 +212,6 @@ class HomeScreen extends StatelessWidget {
     double scale, offsetX, offsetY;
 
     if (screenRatio > imageRatio) {
-
       scale = screen.width / imgH;
       offsetX = 0;
       offsetY = (screen.height - (imgW * scale)) / 2; 
