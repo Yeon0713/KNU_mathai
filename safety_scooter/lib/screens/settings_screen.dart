@@ -77,9 +77,9 @@ class SettingsScreen extends StatelessWidget {
                 ),
                 child: Slider(
                   value: controller.confThreshold.value,
-                  min: 0.5, 
+                  min: 0.2, 
                   max: 1.0, 
-                  divisions: 10, 
+                  divisions: 16, 
                   label: controller.confThreshold.value.toStringAsFixed(2),
                   onChanged: (val) {
                     controller.confThreshold.value = val;
