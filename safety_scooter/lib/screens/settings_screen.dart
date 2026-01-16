@@ -16,99 +16,94 @@ class SettingsScreen extends StatelessWidget {
         backgroundColor: Colors.black,
         iconTheme: const IconThemeData(color: Colors.white),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 언어 설정
-            Text('language'.tr, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Row(
-              children: [
-                _langButton(controller, "한국어", "ko", "KR"),
-                const SizedBox(width: 10),
-                _langButton(controller, "English", "en", "US"),
-              ],
-            ),
-            
-            const Divider(color: Colors.grey, height: 40),
-
-            // ★ AI 민감도 슬라이더 (여기가 핵심!)
-            Text('ai_sensitivity'.tr, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 20),
-            
-            Obx(() {
-              double val = controller.confThreshold.value;
-              return Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+      body: SingleChildScrollView( // ★ 1. 화면이 작을 때 스크롤 가능하게 변경 (세로 오버플로우 방지)
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. 언어 설정
+              Text('language'.tr, style: _headerStyle),
+              const SizedBox(height: 15),
+              Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "${'confidence_desc'.tr}: ${(val * 100).toInt()}%",
-                        style: const TextStyle(color: Colors.white70, fontSize: 16),
-                      ),
-                      Text(
-                        // 값에 따라 상태 메시지 표시
-                        val >= 0.7 ? 'sen_strict'.tr : (val >= 0.5 ? 'sen_balanced'.tr : 'sen_sensitive'.tr),
-                        style: TextStyle(
-                          color: val >= 0.7 ? Colors.greenAccent : Colors.amber, 
-                          fontWeight: FontWeight.bold
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  Slider(
-                    value: val,
-                    min: 0.2, // 최소 20%
-                    max: 0.9, // 최대 90%
-                    divisions: 14, // 5% 단위로 조절
-                    activeColor: Colors.amber,
-                    // ★ 슬라이더 움직이면 값 저장!
-                    onChanged: (newVal) => controller.setConfThreshold(newVal),
-                  ),
-                  Text(
-                    'sen_help'.tr,
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
+                  _langButton(controller, "한국어", "ko", "KR"),
+                  const SizedBox(width: 12),
+                  _langButton(controller, "English", "en", "US"),
                 ],
-              );
-            }),
+              ),
+              
+              const Divider(color: Colors.white24, height: 60),
 
-            const Divider(color: Colors.grey, height: 40),
+              // 2. 위험 감지 민감도 설정
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  // ★ 2. 여기가 핵심 수정! Expanded로 감싸서 글자가 길면 줄바꿈 되도록 함
+                  Expanded(
+                    child: Text(
+                      'ai_sensitivity'.tr, 
+                      style: _headerStyle,
+                      overflow: TextOverflow.ellipsis, // 혹시라도 너무 길면 ... 처리
+                      maxLines: 2, 
+                    ),
+                  ),
+                  const SizedBox(width: 10), // 글자와 숫자 사이 간격
+                  
+                  // 숫자 표시
+                  Obx(() => Text(
+                    controller.confThreshold.value.toStringAsFixed(2), 
+                    style: const TextStyle(color: Colors.blueAccent, fontSize: 18, fontWeight: FontWeight.bold),
+                  )),
+                ],
+              ),
+              const SizedBox(height: 10),
+              
+              Text(
+                'sensitivity_info'.tr, 
+                style: const TextStyle(color: Colors.white54, fontSize: 12, height: 1.5),
+              ),
+              const SizedBox(height: 20),
 
-            // 소리 설정
-            Text('sound_settings'.tr, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            const SizedBox(height: 10),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    const Icon(Icons.volume_up, color: Colors.white70),
-                    const SizedBox(width: 10),
-                    Text('sound_on'.tr, style: const TextStyle(color: Colors.white, fontSize: 16)),
-                  ],
+              // 슬라이더 (0.5 ~ 1.0)
+              Obx(() => SliderTheme(
+                data: SliderTheme.of(context).copyWith(
+                  activeTrackColor: Colors.blueAccent,
+                  inactiveTrackColor: Colors.white24,
+                  thumbColor: Colors.white,
+                  overlayColor: Colors.blueAccent.withOpacity(0.2),
+                  trackHeight: 4.0,
+                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10.0),
                 ),
-                Obx(() => Switch(
-                  value: controller.isSoundOn.value,
-                  activeColor: Colors.amber,
-                  onChanged: (val) => controller.toggleSound(val),
-                )),
-              ],
-            ),
-          ],
+                child: Slider(
+                  value: controller.confThreshold.value,
+                  min: 0.2, 
+                  max: 1.0, 
+                  divisions: 16, 
+                  label: controller.confThreshold.value.toStringAsFixed(2),
+                  onChanged: (val) {
+                    controller.confThreshold.value = val;
+                  },
+                ),
+              )),
+            ],
+          ),
         ),
       ),
     );
   }
 
+  TextStyle get _headerStyle => const TextStyle(
+      color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold);
+
   Widget _langButton(SettingsController controller, String label, String lang, String country) {
     return ElevatedButton(
-      style: ElevatedButton.styleFrom(backgroundColor: Colors.white10, foregroundColor: Colors.white),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: Colors.white12,
+        foregroundColor: Colors.white,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
       onPressed: () => controller.changeLanguage(lang, country),
       child: Text(label),
     );

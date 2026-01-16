@@ -1,41 +1,41 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
-import 'package:safety_scooter/screens/camera_view.dart';
 import '../controllers/global_controller.dart';
+import '../controllers/settings_controller.dart'; 
 import 'camera_view.dart';
-import 'settings_screen.dart'; // <--- 이 줄을 추가하세요!
+import 'settings_screen.dart'; 
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
+    // 1. GlobalController 등록
     final controller = Get.put(GlobalController());
 
+    // 2. SettingsController 등록 및 변수에 담기 (UI에서 쓰기 위해)
+    // permanent: true로 설정하여 앱 종료 전까지 살아있게 함
+    final settingsController = Get.put(SettingsController(), permanent: true);
+
     return Scaffold(
-      backgroundColor: Colors.black, // 카메라 로딩 전 검은색
+      backgroundColor: Colors.black, 
       body: Stack(
         children: [
-          // [Layer 1] 배경: 카메라 
+          // [Layer 1] 배경: 카메라
           Positioned.fill(
             child: CameraView(),
           ),
 
-          // [Layer 1.5] YOLO Bounding Boxes (AI 인식 박스 그리기)
-          // Controller의 yoloResults가 변할 때마다 화면을 다시 그림
+          // [Layer 1.5] YOLO Bounding Boxes
           Obx(() {
             if (controller.yoloResults.isEmpty) return const SizedBox();
-            
-            // 화면 크기 가져오기
             final Size screenSize = MediaQuery.of(context).size;
-            
-            // 박스 그리기 함수 호출
             return Stack(
               children: _renderBoxes(controller, screenSize),
             );
           }),
 
-          // [Layer 2] 시인성 강화 그라데이션 (위, 아래 어둡게)
+          // [Layer 2] 시인성 강화 그라데이션
           Column(
             children: [
               Container(
@@ -62,7 +62,7 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
 
-          // [Layer 3] 위험 감지 시 화면 테두리 붉은 점멸 효과
+          // [Layer 3] 위험 감지 시 붉은 테두리
           Obx(() => controller.isDanger.value
               ? IgnorePointer(
                   child: Container(
@@ -74,14 +74,14 @@ class HomeScreen extends StatelessWidget {
                 )
               : const SizedBox()),
 
-          // [Layer 4] HUD 정보 표시 (UI)
+          // [Layer 4] HUD 정보 표시
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row( 
+                  Row(
                     children: [
                       const Icon(Icons.electric_scooter, color: Colors.white, size: 28),
                       const SizedBox(width: 8),
@@ -89,7 +89,31 @@ class HomeScreen extends StatelessWidget {
                         "Safety Scooter",
                         style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1.0),
                       ),
+                      
                       const Spacer(),
+
+                      // ★ [추가됨] 현재 AI 민감도 표시 박스
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Colors.white24,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.remove_red_eye, color: Colors.blueAccent, size: 16),
+                            const SizedBox(width: 4),
+                            // 실시간으로 변하는 민감도 값 표시
+                            Obx(() => Text(
+                              "AI: ${settingsController.confThreshold.value.toStringAsFixed(2)}", 
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            )),
+                          ],
+                        ),
+                      ),
+
+                      const SizedBox(width: 8), // 아이콘 사이 간격
+
                       // 배터리 아이콘
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -97,11 +121,10 @@ class HomeScreen extends StatelessWidget {
                           color: Colors.white24,
                           borderRadius: BorderRadius.circular(12),
                         ),
-                        child: Row( 
+                        child: Row(
                           children: [
                             const Icon(Icons.battery_std, color: Colors.greenAccent, size: 16),
                             const SizedBox(width: 4),
-                            
                             Obx(() => Text(
                               "${controller.batteryLevel.value}%", 
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
@@ -114,27 +137,27 @@ class HomeScreen extends StatelessWidget {
                   
                   const Spacer(), 
 
-                  // 중앙 하단: 위험 경고 메시지 (조건부 표시)
+                  // 중앙 하단: 위험 경고 메시지
                   Obx(() => controller.isDanger.value
                       ? Center(
                           child: Container(
                             margin: const EdgeInsets.only(bottom: 20),
                             padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFD32F2F),
+                              color: const Color(0xFFD32F2F), 
                               borderRadius: BorderRadius.circular(30),
                               boxShadow: [
                                 BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 20, spreadRadius: 2)
                               ],
                             ),
-                            child: const Row(
+                            child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.warning_amber_rounded, color: Colors.white, size: 30),
-                                SizedBox(width: 10),
+                                const Icon(Icons.warning_amber_rounded, color: Colors.white, size: 30),
+                                const SizedBox(width: 10),
                                 Text(
-                                  "위험 감지! 감속하세요",
-                                  style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+                                  "danger_msg".tr, 
+                                  style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
                                 ),
                               ],
                             ),
@@ -142,7 +165,7 @@ class HomeScreen extends StatelessWidget {
                         )
                       : const SizedBox()),
 
-                  // 하단 대시보드 (속도계)
+                  // 하단 대시보드 (속도계 + 설정 버튼)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -155,7 +178,6 @@ class HomeScreen extends StatelessWidget {
                             textBaseline: TextBaseline.alphabetic,
                             children: [
                               Obx(() => Text(
-                                // "0.0 km/h"에서 숫자만 파싱
                                 controller.speed.value.split(' ')[0], 
                                 style: const TextStyle(
                                   color: Colors.white, 
@@ -172,16 +194,13 @@ class HomeScreen extends StatelessWidget {
                       ),
                       const Spacer(),
                       
-                      // 시뮬레이션 버튼 (디자인에 통합)
+                      // 설정 버튼
                       FloatingActionButton(
                         onPressed: () {
-                          // 설정 화면으로 이동
                           Get.to(() => const SettingsScreen());
                         },
-                        backgroundColor: Colors.grey[800], // 버튼 색상을 조금 더 잘 보이게 변경
-                        elevation: 2, // 그림자 추가
-                        mini: false,  // 버튼 크기를 일반 크기로 키움 (누르기 편하게)
-                        child: const Icon(Icons.settings, color: Colors.white), // 톱니바퀴 아이콘
+                        backgroundColor: Colors.grey[800],
+                        child: const Icon(Icons.settings, color: Colors.white),
                       ),
                     ],
                   ),
@@ -195,17 +214,13 @@ class HomeScreen extends StatelessWidget {
   }
 
   List<Widget> _renderBoxes(GlobalController controller, Size screen) {
-    // 1. 카메라 이미지 크기가 아직 없으면 빈 리스트 반환
     if (controller.camImageHeight.value == 0 || controller.camImageWidth.value == 0) {
       return [];
     }
 
-    // 2. 화면 비율과 이미지 비율 계산 (좌표 밀림 방지)
-    // 안드로이드는 이미지가 90도 돌아가 있으므로 Width/Height를 바꿔서 생각해야 함
     double imgH = controller.camImageHeight.value; 
     double imgW = controller.camImageWidth.value;  
 
-    // 화면이 이미지를 꽉 채울 때(BoxFit.cover)의 스케일과 오차(Offset) 계산
     double screenRatio = screen.width / screen.height;
     double imageRatio = imgH / imgW; 
 
@@ -216,22 +231,16 @@ class HomeScreen extends StatelessWidget {
       offsetX = 0;
       offsetY = (screen.height - (imgW * scale)) / 2; 
     } else {
-
       scale = screen.height / imgW;
-      offsetX = (screen.width - (imgH * scale)) / 2; 
+      offsetX = (screen.width - (imgH * scale)) / 2;
       offsetY = 0;
     }
 
     return controller.yoloResults.map((result) {
-      final box = result["box"]; // [x1, y1, x2, y2, confidence]
+      final box = result["box"]; 
       final String tag = result["tag"];
       final double confidence = (box[4] * 100);
 
-      // -----------------------------------------------------------
-      // [핵심 수정 1] 라벨 이름 변경 (labels.txt 기준)
-      // DANGER_HIT -> 빨간색 (위험)
-      // 그 외 -> 초록색 (안전/기타)
-      // -----------------------------------------------------------
       Color boxColor;
       if (tag == "DANGER_HIT") {
         boxColor = Colors.redAccent;
@@ -241,9 +250,6 @@ class HomeScreen extends StatelessWidget {
         boxColor = Colors.greenAccent;
       }
 
-      // -----------------------------------------------------------
-      // [핵심 수정 2] 좌표 변환 (Scale + Offset)
-      // -----------------------------------------------------------
       double left = box[0] * scale + offsetX;
       double top = box[1] * scale + offsetY;
       double width = (box[2] - box[0]) * scale;
@@ -265,7 +271,6 @@ class HomeScreen extends StatelessWidget {
               color: boxColor.withOpacity(0.8),
               padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
               child: Text(
-                // 태그 이름과 정확도 표시
                 "$tag ${confidence.toStringAsFixed(0)}%",
                 style: const TextStyle(
                     color: Colors.white, 
