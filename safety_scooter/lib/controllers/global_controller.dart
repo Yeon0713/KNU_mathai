@@ -118,7 +118,7 @@ class GlobalController extends GetxController {
           
           if (tag == "DANGER_HIT") {
             dangerFoundThisFrame = true;
-            print("🚨 위험 요소(DANGER_HIT) 감지됨!");
+            print("🚨 위험 요소(DANGER_HIT) 감지됨! [ID: ${obj['id']}]");
           }
         }
       }

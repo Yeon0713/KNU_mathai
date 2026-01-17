@@ -2,13 +2,19 @@ import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
 import 'package:get/get.dart'; 
 import '../controllers/settings_controller.dart'; 
+import 'byte_track.dart';
 
 class AiHandler {
   late FlutterVision _vision;
+  late ByteTracker _tracker;
   bool isLoaded = false;
+  
+  int _frameCount = 0; // 프레임 카운터
+  final int _inferenceInterval = 3; // 3프레임마다 1번 추론 (나머지는 예측)
 
   AiHandler() {
     _vision = FlutterVision();
+    _tracker = ByteTracker();
   }
 
   Future<void> loadYoloModel() async {
@@ -16,7 +22,7 @@ class AiHandler {
       await _vision.loadYoloModel(
         modelPath: 'assets/models/model.tflite', 
         labels: 'assets/models/labels.txt',             
-        modelVersion: "yolov8", 
+        modelVersion: "yolov11", 
         numThreads: 2,
         useGpu: true,
       );
@@ -36,25 +42,37 @@ class AiHandler {
       myThreshold = Get.find<SettingsController>().confThreshold.value;
     }
 
-    try {
-      // 2. AI 추론 실행
-      final results = await _vision.yoloOnFrame(
-        bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
-        imageHeight: cameraImage.height,
-        imageWidth: cameraImage.width,
-        iouThreshold: 0.4, 
-        confThreshold: 0.2, // 라이브러리에는 일단 낮게 줍니다 (우리가 직접 거를 거니까)
-        classThreshold: 0.2,
-      );
-      
-      // 3. ★ [강제 필터링] 여기서 직접 쳐냅니다!
-      // 결과 리스트에서 "정확도가 설정값(myThreshold)보다 낮은 놈"은 다 지워버림
-      final filteredResults = results.where((result) {
-        double confidence = result['box'][4]; // 박스의 5번째 값이 정확도(0.0~1.0)
-        return confidence >= myThreshold;
-      }).toList();
+    _frameCount++;
 
-      return filteredResults;
+    try {
+      /* [기존 로직 주석 처리] 매 프레임 추론
+      // final results = await _vision.yoloOnFrame(
+      //   bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
+      //   imageHeight: cameraImage.height,
+      //   imageWidth: cameraImage.width,
+      //   iouThreshold: 0.4, 
+      //   confThreshold: 0.1, 
+      //   classThreshold: 0.1,
+      // );
+      // return _tracker.update(results, myThreshold);
+      */
+
+      // [새로운 로직] 프레임 스킵 및 예측 보정
+      if (_frameCount % _inferenceInterval == 0) {
+        // 1. 추론 수행 (보정 단계)
+        final results = await _vision.yoloOnFrame(
+          bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
+          imageHeight: cameraImage.height,
+          imageWidth: cameraImage.width,
+          iouThreshold: 0.4, 
+          confThreshold: 0.1, // ByteTrack용 낮은 임계값
+          classThreshold: 0.1,
+        );
+        return _tracker.update(results, myThreshold);
+      } else {
+        // 2. 추론 건너뛰고 예측만 수행 (속도 향상 단계)
+        return _tracker.updateWithoutDetection();
+      }
       
     } catch (e) {
       print("AI 에러: $e");

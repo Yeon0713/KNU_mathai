@@ -1,39 +1,55 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart'; // Ticker 사용을 위해 추가
 import 'package:get/get.dart';
 import '../controllers/global_controller.dart';
 import '../controllers/settings_controller.dart'; 
 import 'camera_view.dart';
 import 'settings_screen.dart'; 
 
-class HomeScreen extends StatelessWidget {
+// 보간된 박스 데이터를 담을 클래스
+class InterpolatedBox {
+  Rect rect; // 현재 화면에 그려질 위치 (보간됨)
+  final String tag;
+  final double confidence;
+  final int id;
+
+  InterpolatedBox(this.rect, this.tag, this.confidence, this.id);
+}
+
+// ★ 변경 1: HomeScreen은 이제 Ticker(애니메이션)와 상관없이 상태만 관리합니다.
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
   @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  late GlobalController controller;
+  late SettingsController settingsController;
+
+  @override
+  void initState() {
+    super.initState();
+    controller = Get.put(GlobalController());
+    settingsController = Get.put(SettingsController(), permanent: true);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // 1. GlobalController 등록
-    final controller = Get.put(GlobalController());
-
-    // 2. SettingsController 등록 및 변수에 담기 (UI에서 쓰기 위해)
-    // permanent: true로 설정하여 앱 종료 전까지 살아있게 함
-    final settingsController = Get.put(SettingsController(), permanent: true);
-
     return Scaffold(
       backgroundColor: Colors.black, 
       body: Stack(
         children: [
           // [Layer 1] 배경: 카메라
           Positioned.fill(
-            child: CameraView(),
+            child: const CameraView(),
           ),
 
-          // [Layer 1.5] YOLO Bounding Boxes
-          Obx(() {
-            if (controller.yoloResults.isEmpty) return const SizedBox();
-            final Size screenSize = MediaQuery.of(context).size;
-            return Stack(
-              children: _renderBoxes(controller, screenSize),
-            );
-          }),
+          // [Layer 1.5] ★ 최적화: 박스 그리는 부분만 별도 위젯으로 분리
+          Positioned.fill(
+            child: BoundingBoxOverlay(controller: controller),
+          ),
 
           // [Layer 2] 시인성 강화 그라데이션
           Column(
@@ -92,7 +108,7 @@ class HomeScreen extends StatelessWidget {
                       
                       const Spacer(),
 
-                      // ★ [추가됨] 현재 AI 민감도 표시 박스
+                      // AI 민감도 표시
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
@@ -103,7 +119,6 @@ class HomeScreen extends StatelessWidget {
                           children: [
                             const Icon(Icons.remove_red_eye, color: Colors.blueAccent, size: 16),
                             const SizedBox(width: 4),
-                            // 실시간으로 변하는 민감도 값 표시
                             Obx(() => Text(
                               "AI: ${settingsController.confThreshold.value.toStringAsFixed(2)}", 
                               style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
@@ -112,7 +127,7 @@ class HomeScreen extends StatelessWidget {
                         ),
                       ),
 
-                      const SizedBox(width: 8), // 아이콘 사이 간격
+                      const SizedBox(width: 8),
 
                       // 배터리 아이콘
                       Container(
@@ -165,7 +180,7 @@ class HomeScreen extends StatelessWidget {
                         )
                       : const SizedBox()),
 
-                  // 하단 대시보드 (속도계 + 설정 버튼)
+                  // 하단 대시보드
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.end,
                     children: [
@@ -212,34 +227,141 @@ class HomeScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  List<Widget> _renderBoxes(GlobalController controller, Size screen) {
-    if (controller.camImageHeight.value == 0 || controller.camImageWidth.value == 0) {
-      return [];
+// ★ 분리된 위젯: 여기서만 60fps로 setState가 발생하므로, 다른 UI(속도계 등)는 영향받지 않음
+class BoundingBoxOverlay extends StatefulWidget {
+  final GlobalController controller;
+  const BoundingBoxOverlay({super.key, required this.controller});
+
+  @override
+  State<BoundingBoxOverlay> createState() => _BoundingBoxOverlayState();
+}
+
+class _BoundingBoxOverlayState extends State<BoundingBoxOverlay> with SingleTickerProviderStateMixin {
+  late Ticker _ticker;
+  final Map<int, InterpolatedBox> _boxes = {};
+
+  @override
+  void initState() {
+    super.initState();
+    _ticker = createTicker(_onTick);
+    _ticker.start();
+  }
+
+  @override
+  void dispose() {
+    _ticker.dispose();
+    super.dispose();
+  }
+
+  void _onTick(Duration elapsed) {
+    // 로직은 동일합니다. widget.controller로 접근하는 것만 다릅니다.
+    if (widget.controller.yoloResults.isEmpty) {
+      if (_boxes.isNotEmpty) {
+        setState(() => _boxes.clear());
+      }
+      return;
     }
 
-    double imgH = controller.camImageHeight.value; 
-    double imgW = controller.camImageWidth.value;  
+    final results = widget.controller.yoloResults;
+    final Set<int> currentIds = {};
+    bool needsRepaint = false;
 
-    double screenRatio = screen.width / screen.height;
+    for (var res in results) {
+      final List<dynamic> boxArr = res['box'];
+      final int id = res['id'] ?? -1;
+      final String tag = res['tag'];
+      final double conf = (boxArr[4] as num).toDouble() * 100;
+      
+      final Rect targetRect = Rect.fromLTRB(
+        (boxArr[0] as num).toDouble(),
+        (boxArr[1] as num).toDouble(),
+        (boxArr[2] as num).toDouble(),
+        (boxArr[3] as num).toDouble(),
+      );
+      
+      currentIds.add(id);
+
+      if (_boxes.containsKey(id)) {
+        final InterpolatedBox old = _boxes[id]!;
+        final Rect newRect = Rect.lerp(old.rect, targetRect, 0.3)!;
+        
+        if (newRect != old.rect) {
+          _boxes[id] = InterpolatedBox(newRect, tag, conf, id);
+          needsRepaint = true;
+        }
+      } else {
+        _boxes[id] = InterpolatedBox(targetRect, tag, conf, id);
+        needsRepaint = true;
+      }
+    }
+
+    final idsToRemove = _boxes.keys.where((id) => !currentIds.contains(id)).toList();
+    if (idsToRemove.isNotEmpty) {
+      for (var id in idsToRemove) {
+        _boxes.remove(id);
+      }
+      needsRepaint = true;
+    }
+
+    if (needsRepaint) {
+      setState(() {});
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: BoundingBoxPainter(
+        _boxes.values.toList(),
+        widget.controller.camImageWidth.value,
+        widget.controller.camImageHeight.value,
+      ),
+    );
+  }
+}
+
+/// 보간된 박스 데이터를 받아 그리는 페인터
+class BoundingBoxPainter extends CustomPainter {
+  final List<InterpolatedBox> boxes; // 수정됨: 컨트롤러 대신 보간된 박스 리스트를 받음
+  final double imgW;
+  final double imgH;
+
+  BoundingBoxPainter(this.boxes, this.imgW, this.imgH);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (imgW == 0 || imgH == 0) return;
+
+    // 화면 비율에 맞춰 이미지 스케일링 계산 (BoxFit.cover 로직)
+    double screenRatio = size.width / size.height;
     double imageRatio = imgH / imgW; 
 
     double scale, offsetX, offsetY;
 
     if (screenRatio > imageRatio) {
-      scale = screen.width / imgH;
+      scale = size.width / imgH;
       offsetX = 0;
-      offsetY = (screen.height - (imgW * scale)) / 2; 
+      offsetY = (size.height - (imgW * scale)) / 2;
     } else {
-      scale = screen.height / imgW;
-      offsetX = (screen.width - (imgH * scale)) / 2;
+      scale = size.height / imgW;
+      offsetX = (size.width - (imgH * scale)) / 2;
       offsetY = 0;
     }
 
-    return controller.yoloResults.map((result) {
-      final box = result["box"]; 
-      final String tag = result["tag"];
-      final double confidence = (box[4] * 100);
+    final Paint paintBox = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.5;
+
+    final Paint paintBg = Paint()
+      ..style = PaintingStyle.fill;
+
+    for (var boxData in boxes) {
+      final rectRaw = boxData.rect;
+      final String tag = boxData.tag;
+      final double confidence = boxData.confidence;
+      final int id = boxData.id;
 
       Color boxColor;
       if (tag == "DANGER_HIT") {
@@ -250,37 +372,51 @@ class HomeScreen extends StatelessWidget {
         boxColor = Colors.greenAccent;
       }
 
-      double left = box[0] * scale + offsetX;
-      double top = box[1] * scale + offsetY;
-      double width = (box[2] - box[0]) * scale;
-      double height = (box[3] - box[1]) * scale;
+      paintBox.color = boxColor;
+      paintBg.color = boxColor.withOpacity(0.8);
 
-      return Positioned(
-        left: left,
-        top: top,
-        width: width,
-        height: height,
-        child: Container(
-          decoration: BoxDecoration(
-            border: Border.all(color: boxColor, width: 2.5),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Align(
-            alignment: Alignment.topLeft,
-            child: Container(
-              color: boxColor.withOpacity(0.8),
-              padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-              child: Text(
-                "$tag ${confidence.toStringAsFixed(0)}%",
-                style: const TextStyle(
-                    color: Colors.white, 
-                    fontSize: 10, 
-                    fontWeight: FontWeight.bold),
-              ),
-            ),
-          ),
-        ),
+      // 좌표 변환 (이미지 좌표계 -> 화면 좌표계)
+      double left = rectRaw.left * scale + offsetX;
+      double top = rectRaw.top * scale + offsetY;
+      double width = rectRaw.width * scale;
+      double height = rectRaw.height * scale;
+
+      // 1. 박스 그리기
+      Rect rect = Rect.fromLTWH(left, top, width, height);
+      canvas.drawRect(rect, paintBox);
+
+      // 2. 텍스트 그리기
+      String text = id != -1
+          ? "[$id] $tag ${confidence.toStringAsFixed(0)}%"
+          : "$tag ${confidence.toStringAsFixed(0)}%";
+
+      TextSpan span = TextSpan(
+        text: text,
+        style: const TextStyle(
+            color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
       );
-    }).toList();
+
+      TextPainter tp = TextPainter(
+        text: span,
+        textAlign: TextAlign.left,
+        textDirection: TextDirection.ltr,
+      );
+      tp.layout();
+
+      // 텍스트 배경
+      canvas.drawRect(
+        Rect.fromLTWH(left, top, tp.width + 8, tp.height + 4),
+        paintBg,
+      );
+
+      // 텍스트
+      tp.paint(canvas, Offset(left + 4, top + 2));
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant BoundingBoxPainter oldDelegate) {
+    // 리스트 내용이 바뀌었거나 길이가 다르면 다시 그림
+    return true; 
   }
 }
