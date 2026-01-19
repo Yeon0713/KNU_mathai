@@ -22,8 +22,9 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    controller = Get.put(GlobalController());
+    // SettingsController를 먼저 등록해야 GlobalController에서 참조 가능
     settingsController = Get.put(SettingsController(), permanent: true);
+    controller = Get.put(GlobalController());
   }
 
   @override

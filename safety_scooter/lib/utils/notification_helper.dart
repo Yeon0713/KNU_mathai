@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:audioplayers/audioplayers.dart';
-//import '../services/api_service.dart';
+import 'package:get/get.dart';
+import '../controllers/settings_controller.dart';
+import '../services/api_service.dart';
 
 class NotificationHelper {
   static final NotificationHelper _instance = NotificationHelper._internal();
@@ -30,8 +32,10 @@ class NotificationHelper {
     print("${warningDetails['msg']} - 크기: ${objectHeight.toStringAsFixed(2)}");
 
     // 2. 서버로 경고 데이터 전송 (Fire-and-forget)
-    // [임시 중단] 서버 POST 요청 로직 끊음 (코드 보존)
-    // ApiService().sendWarning(lat, lng, imagePath);
+    // 설정 확인: 자동 리포트가 켜져있을 때만 전송
+    if (Get.isRegistered<SettingsController>() && Get.find<SettingsController>().isAutoReportOn.value) {
+      ApiService().sendWarning(lat, lng, imagePath);
+    }
 
     // 3. 소리 재생
     _playWarningSound(warningDetails['sound']!);

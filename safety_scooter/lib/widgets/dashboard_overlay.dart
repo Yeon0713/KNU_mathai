@@ -42,6 +42,26 @@ class DashboardOverlay extends StatelessWidget {
           style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w600, letterSpacing: 1.0),
         ),
         const Spacer(),
+        
+        // [추가] GPS 상태 표시 인디케이터
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          decoration: BoxDecoration(
+            color: Colors.white24,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              Obx(() => Icon(
+                Icons.location_on, 
+                color: controller.sensorService.isGpsReady.value ? Colors.greenAccent : Colors.redAccent, 
+                size: 16
+              )),
+            ],
+          ),
+        ),
+        const SizedBox(width: 8),
+
         // AI 민감도 표시
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -140,12 +160,34 @@ class DashboardOverlay extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        FloatingActionButton(
-          onPressed: () {
-            Get.to(() => const SettingsScreen());
-          },
-          backgroundColor: Colors.grey[800],
-          child: const Icon(Icons.settings, color: Colors.white),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // [디버깅] 서버 테스트 버튼
+            FloatingActionButton(
+              heroTag: "test_btn", // 태그 중복 방지
+              onPressed: () {
+                controller.testServerRequest();
+                Get.snackbar("테스트", "서버로 가짜 경고(좌표 포함)를 전송했습니다.",
+                    snackPosition: SnackPosition.BOTTOM,
+                    backgroundColor: Colors.white70,
+                    duration: const Duration(seconds: 1));
+              },
+              backgroundColor: Colors.redAccent,
+              mini: true,
+              child: const Icon(Icons.bug_report, color: Colors.white),
+            ),
+            const SizedBox(width: 10),
+            // 설정 버튼
+            FloatingActionButton(
+              heroTag: "settings_btn", // 태그 중복 방지
+              onPressed: () {
+                Get.to(() => const SettingsScreen());
+              },
+              backgroundColor: Colors.grey[800],
+              child: const Icon(Icons.settings, color: Colors.white),
+            ),
+          ],
         ),
       ],
     );

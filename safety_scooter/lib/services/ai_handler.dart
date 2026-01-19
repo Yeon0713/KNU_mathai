@@ -17,10 +17,10 @@ class AiHandler {
     _tracker = ByteTracker();
   }
 
-  Future<void> loadYoloModel() async {
+  Future<void> loadModel({String? modelPath}) async {
     try {
       await _vision.loadYoloModel(
-        modelPath: 'assets/models/model.tflite', 
+        modelPath: modelPath ?? 'assets/models/model.tflite', 
         labels: 'assets/models/labels.txt',             
         modelVersion: "yolov11", 
         numThreads: 2,

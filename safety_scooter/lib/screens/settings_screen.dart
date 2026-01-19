@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
+import 'package:permission_handler/permission_handler.dart';
 import '../controllers/settings_controller.dart';
 
 class SettingsScreen extends StatelessWidget {
@@ -22,6 +23,12 @@ class SettingsScreen extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 0. 권한 상태 확인 (추가됨)
+              Text("권한 설정", style: _headerStyle),
+              const SizedBox(height: 10),
+              _buildPermissionTile(controller),
+              const Divider(color: Colors.white24, height: 40),
+
               // 1. 언어 설정
               Text('language'.tr, style: _headerStyle),
               const SizedBox(height: 15),
@@ -86,6 +93,54 @@ class SettingsScreen extends StatelessWidget {
                   },
                 ),
               )),
+
+              const Divider(color: Colors.white24, height: 40),
+
+              // 3. 자동 리포트 설정
+              Obx(() => SwitchListTile(
+                title: const Text("자동 리포트 전송", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                subtitle: const Text("위험 감지 시 서버로 정보를 자동 전송합니다.", style: TextStyle(color: Colors.white54, fontSize: 12)),
+                value: controller.isAutoReportOn.value,
+                activeColor: Colors.blueAccent,
+                contentPadding: EdgeInsets.zero,
+                onChanged: (val) => controller.toggleAutoReport(val),
+              )),
+
+              const SizedBox(height: 20),
+
+              // 4. AI 모델 선택
+              Text("AI 모델 선택", style: _headerStyle),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.white12,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Obx(() => DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: controller.selectedModel.value,
+                    dropdownColor: Colors.grey[900],
+                    isExpanded: true,
+                    style: const TextStyle(color: Colors.white, fontSize: 16),
+                    icon: const Icon(Icons.arrow_drop_down, color: Colors.white),
+                    items: controller.modelOptions.map((String value) {
+                      return DropdownMenuItem<String>(
+                        value: value,
+                        child: Text(value),
+                      );
+                    }).toList(),
+                    onChanged: (newValue) {
+                      if (newValue != null) {
+                        controller.setModel(newValue);
+                        Get.snackbar("모델 변경", "모델을 다시 로드합니다...", 
+                          snackPosition: SnackPosition.BOTTOM, 
+                          backgroundColor: Colors.white70, duration: const Duration(seconds: 1));
+                      }
+                    },
+                  ),
+                )),
+              ),
             ],
           ),
         ),
@@ -107,5 +162,60 @@ class SettingsScreen extends StatelessWidget {
       onPressed: () => controller.changeLanguage(lang, country),
       child: Text(label),
     );
+  }
+
+  Widget _buildPermissionTile(SettingsController controller) {
+    return Obx(() {
+      final status = controller.locationPermissionStatus.value;
+      String statusText;
+      Color statusColor;
+      VoidCallback onTap;
+      String buttonText;
+
+      if (status.isGranted) {
+        statusText = "위치 권한 허용됨";
+        statusColor = Colors.greenAccent;
+        onTap = () {}; 
+        buttonText = "완료";
+      } else if (status.isPermanentlyDenied) {
+        statusText = "위치 권한 영구 거부됨";
+        statusColor = Colors.redAccent;
+        onTap = () => openAppSettings();
+        buttonText = "설정 열기";
+      } else {
+        statusText = "위치 권한 필요";
+        statusColor = Colors.orangeAccent;
+        onTap = () => controller.requestLocationPermission();
+        buttonText = "권한 요청";
+      }
+
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white12,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.location_on, color: statusColor),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(statusText, style: const TextStyle(color: Colors.white, fontSize: 16)),
+            ),
+            if (!status.isGranted)
+              ElevatedButton(
+                onPressed: onTap,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white24,
+                  foregroundColor: Colors.white,
+                ),
+                child: Text(buttonText),
+              )
+            else
+               const Icon(Icons.check, color: Colors.greenAccent),
+          ],
+        ),
+      );
+    });
   }
 }

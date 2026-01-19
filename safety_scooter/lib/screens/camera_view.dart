@@ -31,6 +31,7 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
   @override
   void dispose() {
     // 3. 감시자 해제 및 컨트롤러 정리
+    globalController.cameraController = null; // [추가] 참조 해제
     WidgetsBinding.instance.removeObserver(this);
     _controller?.dispose();
     super.dispose();
@@ -107,6 +108,9 @@ class _CameraViewState extends State<CameraView> with WidgetsBindingObserver {
       _controller!.startImageStream((image) {
         globalController.processCameraImage(image);
       });
+
+      // [추가] 컨트롤러를 GlobalController에 연결 (사진 촬영용)
+      globalController.cameraController = _controller;
 
       if (!mounted) return;
       setState(() {

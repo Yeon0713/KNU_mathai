@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:sensors_plus/sensors_plus.dart';
 import 'package:geolocator/geolocator.dart';
@@ -16,6 +17,7 @@ class SensorService extends GetxController {
   // AI 작동 여부를 결정하는 핵심 스위치
   var isMoving = false.obs;         
   
+  
   // 디버깅용
   var rawGpsSpeed = 0.0.obs;        
   var rawVibration = 0.0.obs;       
@@ -23,6 +25,9 @@ class SensorService extends GetxController {
   // 위치 정보 (API 전송용)
   var latitude = 0.0.obs;
   var longitude = 0.0.obs;
+
+  // [추가] GPS 수신 상태 (UI 표시용)
+  var isGpsReady = false.obs;
 
   // ----------------------------------------------------------
   // [튜닝 포인트]
@@ -57,7 +62,30 @@ class SensorService extends GetxController {
   Future<void> _initializeSensors() async {
     var status = await Permission.location.request();
     if (status.isGranted) {
+      // [추가] 앱 시작 시 마지막 위치라도 가져와서 0.0 방지
+      try {
+        Position? lastKnown = await Geolocator.getLastKnownPosition();
+        if (lastKnown != null) {
+          latitude.value = lastKnown.latitude;
+          longitude.value = lastKnown.longitude;
+          isGpsReady.value = true; // [추가] 마지막 위치라도 있으면 준비 완료로 간주
+        }
+      } catch (e) {
+        print("초기 위치 로드 실패: $e");
+      }
       _startGps();
+    } else if (status.isPermanentlyDenied) {
+      // [추가] 권한이 영구적으로 거부된 경우 설정창으로 유도
+      Get.snackbar(
+        "위치 권한 필요",
+        "GPS 기능을 사용하려면 설정에서 위치 권한을 허용해주세요.",
+        mainButton: TextButton(
+          onPressed: () => openAppSettings(),
+          child: const Text("설정", style: TextStyle(color: Colors.blue)),
+        ),
+        backgroundColor: Colors.white70,
+        duration: const Duration(seconds: 5),
+      );
     }
     _startAccelerometer();
   }
@@ -82,6 +110,7 @@ class SensorService extends GetxController {
       // 위치 정보 업데이트
       latitude.value = position.latitude;
       longitude.value = position.longitude;
+      isGpsReady.value = true; // [추가] 실시간 위치 수신 중
 
       // 로직: 속도가 임계값 넘으면 주행 상태로 변경
       if (speedKmph >= GPS_MOVE_THRESHOLD) {
@@ -89,6 +118,37 @@ class SensorService extends GetxController {
         _stopTimer?.cancel(); 
       }
     });
+  }
+
+  // [추가] 외부에서 위치 강제 갱신 요청 (좌표가 0.0일 때 사용)
+  Future<void> forceUpdatePosition() async {
+    // 1. 권한 재확인
+    if (await Permission.location.isDenied) {
+      await Permission.location.request();
+    }
+
+    try {
+      // 2. 마지막으로 알려진 위치 먼저 시도 (가장 빠르고 실패 확률 낮음)
+      Position? lastKnown = await Geolocator.getLastKnownPosition();
+      if (lastKnown != null) {
+        print("📍 [GPS] 마지막 위치 복구 성공: ${lastKnown.latitude}, ${lastKnown.longitude}");
+        latitude.value = lastKnown.latitude;
+        longitude.value = lastKnown.longitude;
+      }
+
+      // 3. 현재 위치 갱신 시도 (정확도 Medium으로 타협하여 성공률 높임)
+      Position pos = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium, 
+        timeLimit: const Duration(seconds: 3),
+      );
+      print("📍 [GPS] 현재 위치 갱신 성공: ${pos.latitude}, ${pos.longitude}");
+      latitude.value = pos.latitude;
+      longitude.value = pos.longitude;
+      isGpsReady.value = true; // [추가] 강제 갱신 성공
+    } catch (e) {
+      print("❌ 위치 강제 업데이트 실패: $e");
+      // 실패하더라도 lastKnown이 성공했다면 latitude는 0.0이 아님
+    }
   }
 
   // ----------------------------------------------------------

@@ -19,12 +19,23 @@ class ApiService {
       // 파일 추가 (file)
       if (imagePath != null && imagePath.isNotEmpty) {
         request.files.add(await http.MultipartFile.fromPath('file', imagePath));
+      } else {
+        // [수정] 이미지가 없을 때(테스트 등) 422 에러 방지를 위해 더미 파일 전송
+        // FastAPI가 'file' 필드를 필수로 요구하기 때문입니다.
+        request.files.add(http.MultipartFile.fromBytes(
+          'file',
+          [], // 빈 바이트
+          filename: 'test_signal.txt',
+        ));
       }
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
       print("📡 서버 전송 결과: ${response.statusCode}");
+      if (response.statusCode != 200) {
+        print("❌ 서버 응답 내용: ${response.body}");
+      }
     } catch (e) {
       print("❌ 서버 전송 실패: $e");
     }

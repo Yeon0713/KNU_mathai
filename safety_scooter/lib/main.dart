@@ -9,8 +9,7 @@ List<CameraDescription> cameras = [];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await GetStorage.init(); // ★ 2. 이 줄을 꼭 추가하세요! (저장소 깨우기)
+  await GetStorage.init();
 
   try {
     cameras = await availableCameras();
