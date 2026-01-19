@@ -33,6 +33,10 @@ class _HomeScreenState extends State<HomeScreen> {
     final settingsController = Get.put(SettingsController(), permanent: true);
     controller.setRideController(rideController);
 
+    // 2. SettingsController 등록 및 변수에 담기 (UI에서 쓰기 위해)
+    // permanent: true로 설정하여 앱 종료 전까지 살아있게 함
+    final settingsController = Get.put(SettingsController(), permanent: true);
+
     return Scaffold(
       backgroundColor: Colors.black,
       body: Stack(

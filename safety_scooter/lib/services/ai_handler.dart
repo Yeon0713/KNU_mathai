@@ -1,5 +1,7 @@
 import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
+import 'package:get/get.dart'; 
+import '../controllers/settings_controller.dart'; 
 
 class AiHandler {
   late FlutterVision vision;
