@@ -73,7 +73,6 @@ flutter:
     - assets/sounds/level2.mp3
     - assets/models/model.tflite
     - assets/models/helmet_model.tflite
-    - assets/models/labels.txt
     - assets/models/helmet_labels.txt
 
   # To add assets to your application, add an assets section, like this:

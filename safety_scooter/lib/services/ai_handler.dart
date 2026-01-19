@@ -2,20 +2,35 @@ import 'package:camera/camera.dart';
 import 'package:flutter_vision/flutter_vision.dart';
 import 'package:get/get.dart'; 
 import '../controllers/settings_controller.dart'; 
+import 'byte_track.dart';
 
 class AiHandler {
-  late FlutterVision vision;
+  late FlutterVision _vision;
+  late ByteTracker _tracker;
+  bool isLoaded = false;
   
-  bool isHazardModelLoaded = false;
-  bool isHelmetModelLoaded = false;
+  int _frameCount = 0; // 프레임 카운터
+  final int _inferenceInterval = 3; // 3프레임마다 1번 추론 (나머지는 예측)
 
   AiHandler() {
-    vision = FlutterVision();
+    _vision = FlutterVision();
+    _tracker = ByteTracker();
   }
 
-  // 1. 모델 초기화 (앱 켜질 때)
-  Future<void> loadModels() async {
-    // GlobalController에서 관리하므로 여기는 비워둡니다.
+  Future<void> loadModel({String? modelPath}) async {
+    try {
+      await _vision.loadYoloModel(
+        modelPath: modelPath ?? 'assets/models/model.tflite', 
+        labels: 'assets/models/labels.txt',             
+        modelVersion: "yolov11", 
+        numThreads: 2,
+        useGpu: true,
+      );
+      isLoaded = true;
+      print("✅ YOLO 모델 로드 성공!");
+    } catch (e) {
+      print("❌ 모델 로드 실패: $e");
+    }
   }
 
   // 2. 모델 교체 함수 (핵심 수정)
@@ -23,35 +38,47 @@ class AiHandler {
     // 기존 모델 닫기 (메모리 해제)
     await vision.closeYoloModel();
 
-    if (toHelmetModel) {
-      // -----------------------------------------------------------
-      // ★ [수정] 에러 방지를 위해 '기존 모델(yolov8n)'을 임시 연결
-      // -----------------------------------------------------------
-      await vision.loadYoloModel(
-        modelPath: 'assets/models/helmet_model.tflite', // 임시로 헬멧 모델 사용
-        labels: 'assets/models/helmet_labels.txt',               // 라벨도 기존 것 사용
-        modelVersion: "yolov8",
-        quantization: false,
-        numThreads: 2,
-        useGpu: true,
-      );
-      isHelmetModelLoaded = true;
-      isHazardModelLoaded = false;
-      print("✅ 헬멧 모드(임시): yolov8n 모델 로드됨 (UI 테스트용)");
+    // 1. 설정값 가져오기 (없으면 기본값 0.5)
+    double myThreshold = 0.5; 
+    if (Get.isRegistered<SettingsController>()) {
+      myThreshold = Get.find<SettingsController>().confThreshold.value;
+    }
+
+    _frameCount++;
+
+    try {
+      /* [기존 로직 주석 처리] 매 프레임 추론
+      // final results = await _vision.yoloOnFrame(
+      //   bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
+      //   imageHeight: cameraImage.height,
+      //   imageWidth: cameraImage.width,
+      //   iouThreshold: 0.4, 
+      //   confThreshold: 0.1, 
+      //   classThreshold: 0.1,
+      // );
+      // return _tracker.update(results, myThreshold);
+      */
+
+      // [새로운 로직] 프레임 스킵 및 예측 보정
+      if (_frameCount % _inferenceInterval == 0) {
+        // 1. 추론 수행 (보정 단계)
+        final results = await _vision.yoloOnFrame(
+          bytesList: cameraImage.planes.map((plane) => plane.bytes).toList(),
+          imageHeight: cameraImage.height,
+          imageWidth: cameraImage.width,
+          iouThreshold: 0.4, 
+          confThreshold: 0.1, // ByteTrack용 낮은 임계값
+          classThreshold: 0.1,
+        );
+        return _tracker.update(results, myThreshold);
+      } else {
+        // 2. 추론 건너뛰고 예측만 수행 (속도 향상 단계)
+        return _tracker.updateWithoutDetection();
+      }
       
-    } else {
-      // 위험 감지 모델 (기존 유지)
-      await vision.loadYoloModel(
-        modelPath: 'assets/models/model.tflite',
-        labels: 'assets/models/labels.txt',
-        modelVersion: "yolov8",
-        quantization: false,
-        numThreads: 2,
-        useGpu: true,
-      );
-      isHazardModelLoaded = true;
-      isHelmetModelLoaded = false;
-      print("✅ 위험 객체 탐지 모드 로드됨");
+    } catch (e) {
+      print("AI 에러: $e");
+      return [];
     }
   }
 

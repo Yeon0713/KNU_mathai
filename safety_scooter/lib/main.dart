@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:camera/camera.dart'; 
-import 'package:get_storage/get_storage.dart'; 
-import 'screens/helmet_check_screen.dart'; // ★ 시작 화면 변경
+import 'package:get_storage/get_storage.dart';
+import 'screens/helmet_check_screen.dart'; 
 import 'utils/languages.dart';
 
 List<CameraDescription> cameras = [];
@@ -36,8 +36,7 @@ class SafetyScooterApp extends StatelessWidget {
         colorSchemeSeed: Colors.blueAccent,
         brightness: Brightness.dark,
       ),
-      // ★ 앱 시작 시 헬멧 체크 화면으로 이동
-      home: const HelmetCheckScreen(), 
+      home: const HelmetCheckScreen(),
     );
   }
 }
