@@ -1,0 +1,4 @@
+body { padding-bottom: 50px; }
+.main-container { height: auto; } /* 스크롤 페이지용 높이 리셋 */
+.accordion-button:not(.collapsed) { background-color: #e7f1ff; color: #0c63e4; }
+.img-thumbnail { width: 80px; height: 80px; object-fit: cover; cursor: pointer; }

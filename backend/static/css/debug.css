@@ -1,0 +1,5 @@
+body { padding-bottom: 50px; }
+.main-container { height: auto; }
+.table-container { background: #fff; padding: 20px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 30px; }
+.img-thumbnail { width: 100px; height: 100px; object-fit: cover; cursor: pointer; }
+.group-id { font-family: monospace; font-size: 0.85rem; color: #666; }
