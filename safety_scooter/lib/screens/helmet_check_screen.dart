@@ -23,9 +23,9 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
       controller.startHelmetCheckMode();
     });
 
-    // [추가] 헬멧 감지 성공 시 홈 화면으로 자동 이동
-    ever(controller.isHelmetDetected, (bool isDetected) {
-      if (isDetected) {
+    // [수정] 5초 인증 완료(isHelmetVerified) 시 홈 화면으로 이동
+    ever(controller.isHelmetVerified, (bool isVerified) {
+      if (isVerified) {
         // "확인되었습니다" 메시지와 아이콘을 볼 수 있게 1.5초 딜레이 후 이동
         Future.delayed(const Duration(milliseconds: 1500), () {
           Get.off(() => const HomeScreen());
@@ -69,8 +69,8 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
                       child: Container(),
                     ),
                     
-                    // 감지 성공 시 아이콘 표시
-                    if (isDetected)
+                    // [수정] 인증 완료 시 체크 아이콘 표시
+                    if (controller.isHelmetVerified.value)
                       Center(
                         child: Container(
                           padding: const EdgeInsets.all(16),
@@ -80,6 +80,24 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
                             border: Border.all(color: Colors.greenAccent, width: 2),
                           ),
                           child: const Icon(Icons.check, color: Colors.greenAccent, size: 48),
+                        ),
+                      ),
+
+                    // [추가] 진행률 프로그레스 바 (인증 완료 전까지만 표시)
+                    if (!controller.isHelmetVerified.value)
+                      Positioned(
+                        bottom: 20,
+                        left: 20,
+                        right: 20,
+                        child: Column(
+                          children: [
+                            LinearProgressIndicator(
+                              value: controller.helmetCheckProgress.value,
+                              backgroundColor: Colors.white24,
+                              color: Colors.greenAccent,
+                              minHeight: 6,
+                            ),
+                          ],
                         ),
                       ),
                   ],
@@ -108,8 +126,10 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
                       ),
                       const SizedBox(height: 10),
                       Obx(() => Text(
-                        controller.isHelmetDetected.value 
+                        controller.isHelmetVerified.value 
                             ? "확인되었습니다." 
+                            : controller.isHelmetDetected.value
+                                ? "헬멧 확인 중... 움직이지 마세요."
                             : "프레임 안에 얼굴을 맞춰주세요.",
                         style: const TextStyle(
                           color: Colors.white70, 

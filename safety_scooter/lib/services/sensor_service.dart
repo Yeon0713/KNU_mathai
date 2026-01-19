@@ -42,7 +42,7 @@ class SensorService extends GetxController {
   @override
   void onInit() {
     super.onInit();
-    _initializeSensors(); 
+    // [수정] 자동 실행 제거 (권한 충돌 방지). GlobalController에서 startSensors() 호출 시 실행됨.
 
     // [리팩토링] 데이터(rawGpsSpeed)가 변하면 UI(displaySpeed)를 자동으로 업데이트
     // 로직과 UI 표현을 분리함
@@ -59,7 +59,8 @@ class SensorService extends GetxController {
     super.onClose();
   }
 
-  Future<void> _initializeSensors() async {
+  // [수정] 외부에서 호출 가능하도록 public으로 변경
+  Future<void> startSensors() async {
     var status = await Permission.location.request();
     if (status.isGranted) {
       // [추가] 앱 시작 시 마지막 위치라도 가져와서 0.0 방지
@@ -94,6 +95,8 @@ class SensorService extends GetxController {
   // [로직 1] GPS: 항상 속도값을 업데이트함
   // ----------------------------------------------------------
   void _startGps() {
+    _gpsSubscription?.cancel(); // [추가] 중복 실행 방지
+
     final locationSettings = LocationSettings(
       accuracy: LocationAccuracy.high, 
       distanceFilter: 2
@@ -155,6 +158,8 @@ class SensorService extends GetxController {
   // [로직 2] 가속도 센서: 화면 글자는 안 바꾸고, 내부 상태(isMoving)만 변경
   // ----------------------------------------------------------
   void _startAccelerometer() {
+    _accelSubscription?.cancel(); // [추가] 중복 실행 방지
+
     _accelSubscription = userAccelerometerEventStream().listen((UserAccelerometerEvent event) {
       double force = sqrt(pow(event.x, 2) + pow(event.y, 2) + pow(event.z, 2));
       rawVibration.value = force;

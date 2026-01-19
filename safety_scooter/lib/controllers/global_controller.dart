@@ -42,6 +42,15 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
   // [주행용] 모드 보관
   bool isRideMode = false;
 
+  // [디버깅용] 오버레이 표시 여부
+  var isDebugOverlayOpen = false.obs;
+
+  // [디버깅용] 추가 정보
+  var fps = 0.0.obs; // 초당 프레임 수
+  var objCount = 0.obs; // 감지된 객체 수
+  var lastServerResponse = "대기 중...".obs; // 마지막 서버 응답
+  DateTime? _lastFrameTime; // FPS 계산용 시간 기록
+
   // [추가] RideController 참조 (주행 상태 확인용)
   RideController? _rideController;
   
@@ -71,6 +80,13 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
 
   // [헬멧 검사용] 헬맷 객체 발견 여부
   RxBool isHelmetDetected = false.obs;
+
+  // [추가] 헬멧 인증 진행률 (0.0 ~ 1.0)
+  RxDouble helmetCheckProgress = 0.0.obs;
+  // [추가] 헬멧 인증 최종 완료 여부
+  RxBool isHelmetVerified = false.obs;
+  // [추가] 헬멧 연속 감지 시작 시간
+  DateTime? _helmetCheckStartTime;
 
   // [센서용] 센서 서비스
   final SensorService sensorService = Get.put(SensorService()); 
@@ -151,6 +167,10 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
   }
 
   Future<void> startHelmetCheckMode() async {
+    // [추가] 권한 충돌 방지: 위치 권한(센서) 먼저 요청하고 완료될 때까지 대기
+    // 이후 아래 _initCamera에서 카메라 권한을 요청하므로 순차적으로 실행됨
+    await sensorService.startSensors();
+
     isRideMode = false;
     await aiHandler.closeModel();
 
@@ -159,6 +179,9 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
 
     isAiEnabled.value = false;
     isHelmetDetected.value = false;
+    helmetCheckProgress.value = 0.0;
+    isHelmetVerified.value = false;
+    _helmetCheckStartTime = null;
 
     // [수정] 헬멧 체크는 전면 카메라 사용
     int cameraIndex = _getCameraIndex(CameraLensDirection.front);
@@ -303,6 +326,25 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
       try {
         bool result = await helmetService.detectHelmet(image);
         isHelmetDetected.value = result;
+
+        // [추가] 5초 유지 로직
+        if (result) {
+          // 감지 시작 시간 기록
+          _helmetCheckStartTime ??= DateTime.now();
+          
+          final duration = DateTime.now().difference(_helmetCheckStartTime!);
+          final double progress = duration.inMilliseconds / 2000.0; // 5초 기준
+          
+          helmetCheckProgress.value = progress > 1.0 ? 1.0 : progress;
+          
+          if (progress >= 1.0) {
+             isHelmetVerified.value = true;
+          }
+        } else {
+          // 감지 끊기면 초기화
+          _helmetCheckStartTime = null;
+          helmetCheckProgress.value = 0.0;
+        }
       } catch (e) {
         print("Helmet check error: $e");
       } finally {
@@ -331,6 +373,15 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
     try {
       final results = await aiHandler.runInference(image);
       yoloResults.value = results; // 결과 업데이트 (화면 박스 그리기용)
+      
+      // [디버깅] 객체 수 및 FPS 업데이트
+      objCount.value = results.length;
+      final now = DateTime.now();
+      if (_lastFrameTime != null) {
+        final diff = now.difference(_lastFrameTime!).inMilliseconds;
+        if (diff > 0) fps.value = 1000 / diff;
+      }
+      _lastFrameTime = now;
 
       // 위험 요소 분석 및 상태 업데이트
       bool dangerFoundThisFrame = _analyzeResultsForDanger(results);
@@ -440,7 +491,28 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
       }
     }
 
-    await ApiService().sendWarning(lat, lng, imagePath);
+    String result = await ApiService().sendWarning(lat, lng, imagePath);
+    lastServerResponse.value = result;
+  }
+
+  // [추가] 디버그 리포트 전송 (실제 좌표 사용)
+  Future<void> sendDebugReport() async {
+    Get.snackbar("전송 중", "서버로 리포트를 전송하고 있습니다...", 
+        snackPosition: SnackPosition.BOTTOM, backgroundColor: Colors.white70, duration: const Duration(seconds: 1));
+        
+    double lat = sensorService.latitude.value;
+    double lng = sensorService.longitude.value;
+
+    // 위치 정보가 없으면 강제 갱신 시도
+    if (lat == 0.0 && lng == 0.0) {
+      await sensorService.forceUpdatePosition();
+      lat = sensorService.latitude.value;
+      lng = sensorService.longitude.value;
+    }
+
+    String? imagePath = await _captureImageForReport();
+    String result = await ApiService().sendWarning(lat, lng, imagePath);
+    lastServerResponse.value = result;
   }
 
   // [추가] 리포트용 사진 촬영 함수

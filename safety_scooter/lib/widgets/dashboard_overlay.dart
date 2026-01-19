@@ -24,6 +24,7 @@ class DashboardOverlay extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildTopBar(),
+            _buildDebugPanel(), // [추가] 디버그 패널
             const Spacer(),
             _buildDangerMessage(),
             _buildBottomDashboard(),
@@ -31,6 +32,67 @@ class DashboardOverlay extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  // [추가] 디버그 패널 위젯
+  Widget _buildDebugPanel() {
+    return Obx(() {
+      if (!controller.isDebugOverlayOpen.value) return const SizedBox();
+      return Container(
+        margin: const EdgeInsets.only(top: 10),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.black87.withOpacity(0.9),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: Colors.white24),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text("🛠 디버그 모드", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+            const Divider(color: Colors.white24),
+            const SizedBox(height: 8),
+            Obx(() => Text("위도 (Lat): ${controller.sensorService.latitude.value.toStringAsFixed(7)}", 
+                style: const TextStyle(color: Colors.greenAccent, fontFamily: "monospace"))),
+            const SizedBox(height: 4),
+            Obx(() => Text("경도 (Lng): ${controller.sensorService.longitude.value.toStringAsFixed(7)}", 
+                style: const TextStyle(color: Colors.greenAccent, fontFamily: "monospace"))),
+            
+            const SizedBox(height: 8),
+            const Divider(color: Colors.white24),
+            const SizedBox(height: 8),
+
+            // [추가] AI 성능 및 센서 데이터
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Obx(() => Text("FPS: ${controller.fps.value.toStringAsFixed(1)}", style: const TextStyle(color: Colors.amberAccent))),
+                Obx(() => Text("Objects: ${controller.objCount.value}", style: const TextStyle(color: Colors.amberAccent))),
+              ],
+            ),
+            Obx(() => Text("Vibration: ${controller.sensorService.rawVibration.value.toStringAsFixed(2)}", 
+                style: const TextStyle(color: Colors.white70, fontSize: 12))),
+            const SizedBox(height: 4),
+            Obx(() => Text("Server: ${controller.lastServerResponse.value}", 
+                style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 12))),
+
+            const SizedBox(height: 16),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => controller.sendDebugReport(),
+                icon: const Icon(Icons.send, size: 16),
+                label: const Text("현재 상태 리포트 전송"),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.blueAccent,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    });
   }
 
   Widget _buildTopBar() {
@@ -61,26 +123,7 @@ class DashboardOverlay extends StatelessWidget {
             ],
           ),
         ),
-        const SizedBox(width: 8),
-
-        // AI 민감도 표시
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-          decoration: BoxDecoration(
-            color: Colors.white24,
-            borderRadius: BorderRadius.circular(12),
-          ),
-          child: Row(
-            children: [
-              const Icon(Icons.remove_red_eye, color: Colors.blueAccent, size: 16),
-              const SizedBox(width: 4),
-              Obx(() => Text(
-                "AI: ${settingsController.confThreshold.value.toStringAsFixed(2)}",
-                style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-              )),
-            ],
-          ),
-        ),
+        
         const SizedBox(width: 8),
         // 배터리 아이콘
         Container(
@@ -176,13 +219,8 @@ class DashboardOverlay extends StatelessWidget {
                   height: 40,
                   child: FloatingActionButton(
                     heroTag: "test_btn",
-                    onPressed: () {
-                      controller.testServerRequest();
-                      Get.snackbar("테스트", "서버로 가짜 경고(좌표 포함)를 전송했습니다.",
-                          snackPosition: SnackPosition.BOTTOM,
-                          backgroundColor: Colors.white70,
-                          duration: const Duration(seconds: 1));
-                    },
+                    // [수정] 버튼 클릭 시 디버그 오버레이 토글
+                    onPressed: () => controller.isDebugOverlayOpen.toggle(),
                     backgroundColor: Colors.redAccent.withOpacity(0.8),
                     mini: true,
                     child: const Icon(Icons.bug_report, color: Colors.white, size: 20),

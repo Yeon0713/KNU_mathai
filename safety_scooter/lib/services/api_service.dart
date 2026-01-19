@@ -8,7 +8,7 @@ class ApiService {
   // FastAPI 서버 주소 (내부망)
   final String _serverUrl = 'http://192.168.8.158:8000/api/report';
 
-  Future<void> sendWarning(double? lat, double? lng, String? imagePath) async {
+  Future<String> sendWarning(double? lat, double? lng, String? imagePath) async {
     try {
       var request = http.MultipartRequest('POST', Uri.parse(_serverUrl));
 
@@ -35,9 +35,12 @@ class ApiService {
       print("📡 서버 전송 결과: ${response.statusCode}");
       if (response.statusCode != 200) {
         print("❌ 서버 응답 내용: ${response.body}");
+        return "실패 (${response.statusCode})";
       }
+      return "성공 (200 OK)";
     } catch (e) {
       print("❌ 서버 전송 실패: $e");
+      return "에러: $e";
     }
   }
 }

@@ -47,7 +47,7 @@ class HelmetService {
     print("🔍 AI 판단 -> 0번: ${(prob0 * 100).toStringAsFixed(1)}%  vs  1번: ${(prob1 * 100).toStringAsFixed(1)}%");
 
     // 만약 0번이 헬멧이라면:
-    bool isHelmet = (prob0 > 0.7);
+    bool isHelmet = (prob0 > 0.55);
     
     // [중요] 만약 헬멧을 썼는데도 false가 나오면, 
     // 아래 줄의 주석을 풀고 위 줄을 주석 처리해서 순서를 뒤집으세요.
