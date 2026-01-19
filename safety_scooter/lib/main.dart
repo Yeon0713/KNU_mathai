@@ -1,16 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:camera/camera.dart'; 
-import 'package:get_storage/get_storage.dart'; // ★ 1. 패키지 추가
-import 'screens/home_screen.dart'; 
+import 'package:get_storage/get_storage.dart'; 
+import 'screens/helmet_check_screen.dart'; // ★ 시작 화면 변경
 import 'utils/languages.dart';
 
 List<CameraDescription> cameras = [];
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  await GetStorage.init(); // ★ 2. 이 줄을 꼭 추가하세요! (저장소 깨우기)
+  await GetStorage.init();
 
   try {
     cameras = await availableCameras();
@@ -37,7 +36,8 @@ class SafetyScooterApp extends StatelessWidget {
         colorSchemeSeed: Colors.blueAccent,
         brightness: Brightness.dark,
       ),
-      home: const HomeScreen(),
+      // ★ 앱 시작 시 헬멧 체크 화면으로 이동
+      home: const HelmetCheckScreen(), 
     );
   }
 }
