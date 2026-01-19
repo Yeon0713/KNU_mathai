@@ -49,11 +49,9 @@ class GlobalController extends GetxController {
     _initBatteryTracking();
     
     // SensorService의 속도/움직임 상태를 감시
-    ever(sensorService.displaySpeed, (String val) {
-      speed.value = val;
-      
-      // 속도 파싱 (예: "35.0 km/h" -> 35.0)
-      double currentSpeed = double.tryParse(val.split(' ')[0]) ?? 0.0;
+    // [리팩토링] 문자열 파싱 제거 -> rawGpsSpeed(double) 직접 구독
+    ever(sensorService.rawGpsSpeed, (double currentSpeed) {
+      speed.value = "${currentSpeed.toStringAsFixed(1)} km/h"; // UI용 변수 업데이트
       
       // 속도 위반 여부 업데이트 (30km/h 초과 시 위반)
       bool newSpeedStatus = (currentSpeed > 30.0);
@@ -81,7 +79,12 @@ class GlobalController extends GetxController {
 
     // 상태가 '안전' -> '위험'으로 바뀔 때만 소리 재생 (중복 재생 방지)
     if (finalDangerStatus && !isDanger.value) {
-      _notification.triggerWarning(0.25);
+      _notification.triggerWarning(
+        0.25,
+        lat: sensorService.latitude.value,
+        lng: sensorService.longitude.value,
+        imagePath: "", // TODO: 카메라 이미지를 파일로 저장 후 경로 전달 필요
+      );
     }
     
     // UI 업데이트 (화면 테두리 빨간색 등)
@@ -93,10 +96,7 @@ class GlobalController extends GetxController {
   // --------------------------------------------------------
   Future<void> processCameraImage(CameraImage image) async {
     // 모델 로딩 전이나 이미 분석 중이면 패스
-    if (isDetecting || !isModelLoaded) return;
-    
-    // (선택사항) 정지 중일 때 배터리 아끼려면 아래 주석 해제
-    // if (!sensorService.isMoving.value) return; 
+    if (_shouldSkipFrame()) return;
 
     isDetecting = true;
 
@@ -108,31 +108,42 @@ class GlobalController extends GetxController {
       final results = await aiHandler.runInference(image);
       yoloResults.value = results; // 결과 업데이트 (화면 박스 그리기용)
 
-      // 이번 프레임에서 위험 요소가 있는지 확인
-      bool dangerFoundThisFrame = false;
-      
-      if (results.isNotEmpty) {
-        for (var obj in results) {
-          String tag = obj['tag']; 
-          
-          
-          if (tag == "DANGER_HIT") {
-            dangerFoundThisFrame = true;
-            print("🚨 위험 요소(DANGER_HIT) 감지됨! [ID: ${obj['id']}]");
-          }
-        }
-      }
+      // 위험 요소 분석 및 상태 업데이트
+      bool dangerFoundThisFrame = _analyzeResultsForDanger(results);
 
-      // 상태가 바뀌었을 때만 업데이트 (성능 최적화)
-      if (_isObjectDetected != dangerFoundThisFrame) {
-        _isObjectDetected = dangerFoundThisFrame;
-        _checkTotalDanger(); // 종합 판단 요청
-      }
-
+      _updateDetectionStatus(dangerFoundThisFrame);
     } catch (e) {
       print("Error in AI loop: $e");
     } finally {
       isDetecting = false;
+    }
+  }
+
+  /// 프레임 처리를 건너뛸지 결정
+  bool _shouldSkipFrame() {
+    if (isDetecting || !isModelLoaded) return true;
+    // (선택사항) 정지 중일 때 배터리 절약: if (!sensorService.isMoving.value) return true;
+    return false;
+  }
+
+  /// AI 결과에서 위험 요소(DANGER_HIT)가 있는지 확인
+  bool _analyzeResultsForDanger(List<Map<String, dynamic>> results) {
+    if (results.isEmpty) return false;
+
+    for (var obj in results) {
+      if (obj['tag'] == "DANGER_HIT") {
+        print("🚨 위험 요소(DANGER_HIT) 감지됨! [ID: ${obj['id']}]");
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// 감지 상태가 변경되었을 때만 업데이트 수행
+  void _updateDetectionStatus(bool dangerFound) {
+    if (_isObjectDetected != dangerFound) {
+      _isObjectDetected = dangerFound;
+      _checkTotalDanger(); // 종합 판단 요청
     }
   }
 

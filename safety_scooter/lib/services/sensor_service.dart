@@ -20,6 +20,10 @@ class SensorService extends GetxController {
   var rawGpsSpeed = 0.0.obs;        
   var rawVibration = 0.0.obs;       
 
+  // 위치 정보 (API 전송용)
+  var latitude = 0.0.obs;
+  var longitude = 0.0.obs;
+
   // ----------------------------------------------------------
   // [튜닝 포인트]
   // ----------------------------------------------------------
@@ -34,6 +38,12 @@ class SensorService extends GetxController {
   void onInit() {
     super.onInit();
     _initializeSensors(); 
+
+    // [리팩토링] 데이터(rawGpsSpeed)가 변하면 UI(displaySpeed)를 자동으로 업데이트
+    // 로직과 UI 표현을 분리함
+    ever(rawGpsSpeed, (double val) {
+      displaySpeed.value = "${val.toStringAsFixed(1)} km/h";
+    });
   }
 
   @override
@@ -69,8 +79,9 @@ class SensorService extends GetxController {
 
       rawGpsSpeed.value = speedKmph;
 
-      // ★ [수정] 조건문 밖에서도 항상 화면에 속도 표시 (0.0 km/h 포함)
-      displaySpeed.value = "${speedKmph.toStringAsFixed(1)} km/h";
+      // 위치 정보 업데이트
+      latitude.value = position.latitude;
+      longitude.value = position.longitude;
 
       // 로직: 속도가 임계값 넘으면 주행 상태로 변경
       if (speedKmph >= GPS_MOVE_THRESHOLD) {
@@ -108,8 +119,8 @@ class SensorService extends GetxController {
           if (rawGpsSpeed.value < GPS_MOVE_THRESHOLD) {
             isMoving.value = false;
             
-            // ★ [수정] "정지" 대신 숫자로 초기화
-            displaySpeed.value = "0.0 km/h";
+            // [리팩토링] 값을 0으로 맞추면 ever()가 알아서 UI 텍스트를 "0.0 km/h"로 바꿈
+            rawGpsSpeed.value = 0.0;
           }
         });
       }
