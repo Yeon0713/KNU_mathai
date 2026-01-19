@@ -33,8 +33,10 @@ class AiHandler {
     }
   }
 
-  Future<List<Map<String, dynamic>>> runInference(CameraImage cameraImage) async {
-    if (!isLoaded) return [];
+  // 2. 모델 교체 함수 (핵심 수정)
+  Future<void> switchModel({required bool toHelmetModel}) async {
+    // 기존 모델 닫기 (메모리 해제)
+    await vision.closeYoloModel();
 
     // 1. 설정값 가져오기 (없으면 기본값 0.5)
     double myThreshold = 0.5; 
@@ -80,8 +82,20 @@ class AiHandler {
     }
   }
 
+  // 3. 추론 실행
+  Future<List<Map<String, dynamic>>> runInference(CameraImage image) async {
+    final result = await vision.yoloOnFrame(
+      bytesList: image.planes.map((plane) => plane.bytes).toList(),
+      imageHeight: image.height,
+      imageWidth: image.width,
+      iouThreshold: 0.4,
+      confThreshold: 0.4,
+      classThreshold: 0.5,
+    );
+    return result;
+  }
+
   Future<void> closeModel() async {
-    await _vision.closeYoloModel();
-    isLoaded = false;
+    await vision.closeYoloModel();
   }
 }

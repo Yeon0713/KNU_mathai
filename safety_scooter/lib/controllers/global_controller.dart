@@ -142,6 +142,7 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
 
   @override
   void onClose() {
+    cameraController?.dispose();
     aiHandler.closeModel();
     helmetService.closeModel();
     cameraController?.dispose();
@@ -278,7 +279,7 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
   }
 
   // --------------------------------------------------------
-  // 3. 종합 위험 판단 로직 (GPS + AI 결과 합치기)
+  // 모드 전환
   // --------------------------------------------------------
   Future<void> _checkTotalDanger() async {
     // 둘 중 하나라도 위험하면 '위험'으로 간주
@@ -316,7 +317,7 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
   }
 
   // --------------------------------------------------------
-  // 4. AI 이미지 처리 (카메라에서 호출)
+  // AI 이미지 처리 (수정된 핵심 로직)
   // --------------------------------------------------------
   Future<void> processCameraImage(CameraImage image) async {
     if (isDetecting) return;
@@ -390,7 +391,7 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
 
       _updateDetectionStatus(dangerFoundThisFrame);
     } catch (e) {
-      print("Error in AI loop: $e");
+      print("AI Loop Error: $e");
     } finally {
       isDetecting = false;
     }
