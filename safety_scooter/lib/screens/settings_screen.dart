@@ -108,6 +108,48 @@ class SettingsScreen extends StatelessWidget {
 
               const SizedBox(height: 20),
 
+              // [추가] 서버 설정 (IP / Port)
+              Text("서버 설정", style: _headerStyle),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  // IP 입력
+                  Expanded(
+                    flex: 2,
+                    child: TextField(
+                      controller: controller.ipController,
+                      style: const TextStyle(color: Colors.white),
+                      decoration: const InputDecoration(
+                        labelText: "IP Address",
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  // Port 입력
+                  Expanded(
+                    flex: 1,
+                    child: TextField(
+                      controller: controller.portController,
+                      style: const TextStyle(color: Colors.white),
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(
+                        labelText: "Port",
+                        labelStyle: TextStyle(color: Colors.white70),
+                        enabledBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.white24)),
+                        focusedBorder: OutlineInputBorder(borderSide: BorderSide(color: Colors.blueAccent)),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              const Divider(color: Colors.white24, height: 40),
+
+              const SizedBox(height: 20),
+
               // 4. AI 모델 선택
               Text("AI 모델 선택", style: _headerStyle),
               const SizedBox(height: 10),

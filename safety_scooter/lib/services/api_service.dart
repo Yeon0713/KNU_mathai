@@ -1,12 +1,19 @@
 import 'package:http/http.dart' as http;
+import 'package:get_storage/get_storage.dart';
 
 class ApiService {
   static final ApiService _instance = ApiService._internal();
   factory ApiService() => _instance;
   ApiService._internal();
 
-  // FastAPI 서버 주소 (내부망)
-  final String _serverUrl = 'http://192.168.8.158:8000/api/report';
+  final GetStorage _box = GetStorage();
+
+  // [수정] 저장된 IP/Port를 기반으로 URL 동적 생성
+  String get _serverUrl {
+    String ip = _box.read('server_ip') ?? '192.168.8.158';
+    String port = _box.read('server_port') ?? '8000';
+    return 'http://$ip:$port/api/report';
+  }
 
   Future<String> sendWarning(double? lat, double? lng, String? imagePath) async {
     try {
@@ -41,6 +48,22 @@ class ApiService {
     } catch (e) {
       print("❌ 서버 전송 실패: $e");
       return "에러: $e";
+    }
+  }
+
+  // [추가] 서버 연결 상태 확인 (Root 경로)
+  Future<String> checkConnection() async {
+    try {
+      String ip = _box.read('server_ip') ?? '192.168.8.158';
+      String port = _box.read('server_port') ?? '8000';
+      final uri = Uri.parse('http://$ip:$port/');
+      
+      final response = await http.get(uri).timeout(const Duration(seconds: 3));
+      // 연결은 되었으나 200이 아닐 수도 있음 (예: 404)
+      return "Online (${response.statusCode})";
+    } catch (e) {
+      // 연결 실패 (타임아웃, 거부됨 등)
+      return "Offline";
     }
   }
 }

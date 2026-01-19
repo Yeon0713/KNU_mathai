@@ -76,7 +76,35 @@ class DashboardOverlay extends StatelessWidget {
             Obx(() => Text("Server: ${controller.lastServerResponse.value}", 
                 style: const TextStyle(color: Colors.lightBlueAccent, fontSize: 12))),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
+            const Divider(color: Colors.white24),
+            
+            // [추가] 서버 연결 상태 확인 UI
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text("Server Status:", style: TextStyle(color: Colors.white70)),
+                Obx(() => Text(
+                  controller.serverStatus.value, 
+                  style: TextStyle(
+                    color: controller.isServerOnline.value ? Colors.greenAccent : Colors.redAccent,
+                    fontWeight: FontWeight.bold
+                  )
+                )),
+              ],
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => controller.checkServerConnection(),
+                icon: const Icon(Icons.wifi, size: 16),
+                label: const Text("서버 연결 테스트 (Root)"),
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], foregroundColor: Colors.white),
+              ),
+            ),
+            const SizedBox(height: 8),
+
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(

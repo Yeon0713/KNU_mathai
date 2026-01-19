@@ -24,6 +24,12 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   // 5. 위치 권한 상태
   var locationPermissionStatus = PermissionStatus.denied.obs;
 
+  // 6. 서버 설정 (IP, Port)
+  var serverIp = '192.168.8.158'.obs;
+  var serverPort = '8000'.obs;
+  late TextEditingController ipController;
+  late TextEditingController portController;
+
   @override
   void onInit() {
     super.onInit();
@@ -41,6 +47,19 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
     if (box.hasData('selectedModel')) {
       selectedModel.value = box.read('selectedModel');
     }
+    if (box.hasData('server_ip')) {
+      serverIp.value = box.read('server_ip');
+    }
+    if (box.hasData('server_port')) {
+      serverPort.value = box.read('server_port');
+    }
+
+    ipController = TextEditingController(text: serverIp.value);
+    portController = TextEditingController(text: serverPort.value);
+
+    // 입력값 변경 시 자동 저장
+    ipController.addListener(() => box.write('server_ip', ipController.text));
+    portController.addListener(() => box.write('server_port', portController.text));
 
     // assets/models 폴더 스캔하여 목록 업데이트
     _loadModelList();
@@ -51,6 +70,8 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
 
   @override
   void onClose() {
+    ipController.dispose();
+    portController.dispose();
     WidgetsBinding.instance.removeObserver(this); // 감지 해제
     super.onClose();
   }

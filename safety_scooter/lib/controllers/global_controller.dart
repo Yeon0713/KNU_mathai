@@ -49,6 +49,8 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
   var fps = 0.0.obs; // 초당 프레임 수
   var objCount = 0.obs; // 감지된 객체 수
   var lastServerResponse = "대기 중...".obs; // 마지막 서버 응답
+  var serverStatus = "미확인".obs; // [추가] 서버 연결 상태
+  var isServerOnline = false.obs; // [추가] 서버 온라인 여부 (색상용)
   DateTime? _lastFrameTime; // FPS 계산용 시간 기록
 
   // [추가] RideController 참조 (주행 상태 확인용)
@@ -513,6 +515,14 @@ class GlobalController extends GetxController with WidgetsBindingObserver {
     String? imagePath = await _captureImageForReport();
     String result = await ApiService().sendWarning(lat, lng, imagePath);
     lastServerResponse.value = result;
+  }
+
+  // [추가] 서버 연결 테스트 (Ping)
+  Future<void> checkServerConnection() async {
+    serverStatus.value = "확인 중...";
+    String status = await ApiService().checkConnection();
+    serverStatus.value = status;
+    isServerOnline.value = status.contains("Online");
   }
 
   // [추가] 리포트용 사진 촬영 함수
