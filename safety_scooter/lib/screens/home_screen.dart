@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/global_controller.dart';
 import '../controllers/settings_controller.dart'; 
+import '../controllers/ride_controller.dart';
 import 'camera_view.dart';
 import '../widgets/bounding_box_overlay.dart';
 import '../widgets/gradient_overlay.dart';
@@ -25,6 +26,15 @@ class _HomeScreenState extends State<HomeScreen> {
     // SettingsController를 먼저 등록해야 GlobalController에서 참조 가능
     settingsController = Get.put(SettingsController(), permanent: true);
     controller = Get.put(GlobalController());
+
+    // RideController 생성 및 연결
+    final rideController = Get.put(RideController()); // DashboardOverlay에서 사용됨
+    controller.setRideController(rideController);
+
+    // 화면 진입 시 주행 모드(후면 카메라)로 전환
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      controller.startRideMode();
+    });
   }
 
   @override

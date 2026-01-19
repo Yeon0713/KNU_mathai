@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import 'package:camera/camera.dart'; 
-import 'package:get_storage/get_storage.dart'; // ★ 1. 패키지 추가
-import 'screens/home_screen.dart'; 
+import 'package:get_storage/get_storage.dart';
+import 'screens/helmet_check_screen.dart'; 
 import 'utils/languages.dart';
 
 List<CameraDescription> cameras = [];
@@ -36,7 +36,7 @@ class SafetyScooterApp extends StatelessWidget {
         colorSchemeSeed: Colors.blueAccent,
         brightness: Brightness.dark,
       ),
-      home: const HomeScreen(),
+      home: const HelmetCheckScreen(),
     );
   }
 }

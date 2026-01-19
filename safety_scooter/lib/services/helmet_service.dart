@@ -67,10 +67,6 @@ class HelmetService {
     int stepX = width ~/ inputSize;
     int stepY = height ~/ inputSize;
 
-    // 안전하게 픽셀 접근
-    final int uvRowStride = image.planes[1].bytesPerRow;
-    // bytesPerPixel이 null이면 1로 처리
-    final int uvPixelStride = image.planes[1].bytesPerPixel ?? 1; 
 
     for (int y = 0; y < inputSize; y++) {
       for (int x = 0; x < inputSize; x++) {
@@ -81,19 +77,18 @@ class HelmetService {
         if (srcX >= width) srcX = width - 1;
         if (srcY >= height) srcY = height - 1;
 
-        // YUV -> RGB 근사 변환 (속도 최적화를 위해 Y값 위주 사용)
-        final int uvIndex = (srcX ~/ 2) * uvPixelStride + (srcY ~/ 2) * uvRowStride;
+        // Y값만 사용하여 Grayscale로 처리 (속도 최적화)
         final int index = srcY * image.planes[0].bytesPerRow + srcX;
 
         // 범위 체크
         if (index < image.planes[0].bytes.length) {
            final yValue = image.planes[0].bytes[index];
-           // 정규화 (0~1)
            double pixel = yValue / 255.0;
 
-           input[0][y][x][0] = pixel; // R
-           input[0][y][x][1] = pixel; // G
-           input[0][y][x][2] = pixel; // B
+           var pixelList = input[0][y][x];
+           pixelList[0] = pixel;
+           pixelList[1] = pixel;
+           pixelList[2] = pixel;
         }
       }
     }

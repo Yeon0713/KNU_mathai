@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:get/get.dart';
 import '../controllers/global_controller.dart';
 import '../controllers/settings_controller.dart';
+import '../controllers/ride_controller.dart';
 import '../screens/settings_screen.dart';
 
 class DashboardOverlay extends StatelessWidget {
@@ -133,6 +134,8 @@ class DashboardOverlay extends StatelessWidget {
   }
 
   Widget _buildBottomDashboard() {
+    final RideController rideController = Get.find<RideController>();
+
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
@@ -160,33 +163,55 @@ class DashboardOverlay extends StatelessWidget {
           ],
         ),
         const Spacer(),
-        Row(
+        Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.end,
           children: [
-            // [디버깅] 서버 테스트 버튼
-            FloatingActionButton(
-              heroTag: "test_btn", // 태그 중복 방지
-              onPressed: () {
-                controller.testServerRequest();
-                Get.snackbar("테스트", "서버로 가짜 경고(좌표 포함)를 전송했습니다.",
-                    snackPosition: SnackPosition.BOTTOM,
-                    backgroundColor: Colors.white70,
-                    duration: const Duration(seconds: 1));
-              },
-              backgroundColor: Colors.redAccent,
-              mini: true,
-              child: const Icon(Icons.bug_report, color: Colors.white),
+            Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // [디버깅] 서버 테스트 버튼 (작게 유지)
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: FloatingActionButton(
+                    heroTag: "test_btn",
+                    onPressed: () {
+                      controller.testServerRequest();
+                      Get.snackbar("테스트", "서버로 가짜 경고(좌표 포함)를 전송했습니다.",
+                          snackPosition: SnackPosition.BOTTOM,
+                          backgroundColor: Colors.white70,
+                          duration: const Duration(seconds: 1));
+                    },
+                    backgroundColor: Colors.redAccent.withOpacity(0.8),
+                    mini: true,
+                    child: const Icon(Icons.bug_report, color: Colors.white, size: 20),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                // 설정 버튼 (작게 변경하여 균형 맞춤)
+                SizedBox(
+                  width: 40,
+                  height: 40,
+                  child: FloatingActionButton(
+                    heroTag: "settings_btn",
+                    onPressed: () => Get.to(() => const SettingsScreen()),
+                    backgroundColor: Colors.grey[800],
+                    mini: true,
+                    child: const Icon(Icons.settings, color: Colors.white, size: 20),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(width: 10),
-            // 설정 버튼
-            FloatingActionButton(
-              heroTag: "settings_btn", // 태그 중복 방지
-              onPressed: () {
-                Get.to(() => const SettingsScreen());
-              },
-              backgroundColor: Colors.grey[800],
-              child: const Icon(Icons.settings, color: Colors.white),
-            ),
+            const SizedBox(height: 12),
+            // [주행] 시작/종료 버튼 (메인 액션)
+            Obx(() => FloatingActionButton.extended(
+                  heroTag: "ride_btn",
+                  onPressed: () => rideController.isRiding.value ? rideController.stopRide() : rideController.startRide(),
+                  backgroundColor: rideController.isRiding.value ? Colors.red : Colors.green,
+                  icon: Icon(rideController.isRiding.value ? Icons.stop : Icons.play_arrow, color: Colors.white),
+                  label: Text(rideController.isRiding.value ? "주행 종료" : "주행 시작", style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                )),
           ],
         ),
       ],

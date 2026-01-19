@@ -12,7 +12,8 @@ class HelmetCheckScreen extends StatefulWidget {
 }
 
 class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
-  final GlobalController controller = Get.put(GlobalController());
+  // [수정] 화면이 넘어가도 컨트롤러가 죽지 않도록 permanent: true 설정
+  final GlobalController controller = Get.put(GlobalController(), permanent: true);
 
   @override
   void initState() {
@@ -21,12 +22,21 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.startHelmetCheckMode();
     });
+
+    // [추가] 헬멧 감지 성공 시 홈 화면으로 자동 이동
+    ever(controller.isHelmetDetected, (bool isDetected) {
+      if (isDetected) {
+        // "확인되었습니다" 메시지와 아이콘을 볼 수 있게 1.5초 딜레이 후 이동
+        Future.delayed(const Duration(milliseconds: 1500), () {
+          Get.off(() => const HomeScreen());
+        });
+      }
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     // 화면 크기 계산 (프레임 위치 잡기용)
-    final size = MediaQuery.of(context).size;
     final double frameWidth = 280;
     final double frameHeight = 350;
 
@@ -34,21 +44,15 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // ------------------------------------------------
           // 1. 카메라 뷰 (전체 화면)
-          // ------------------------------------------------
           const Positioned.fill(
             child: CameraView(),
           ),
 
-          // ------------------------------------------------
           // 2. 어두운 배경 오버레이 (가운데 뚫린 효과)
-          // ------------------------------------------------
           _buildDarkOverlay(frameWidth, frameHeight),
 
-          // ------------------------------------------------
-          // 3. 중앙 고정 프레임 (애니메이션 없음)
-          // ------------------------------------------------
+          // 3. 중앙 고정 프레임
           Center(
             child: Obx(() {
               bool isDetected = controller.isHelmetDetected.value;
@@ -57,7 +61,7 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
                 height: frameHeight,
                 child: Stack(
                   children: [
-                    // 정적 테두리 (색상만 변경)
+                    // 정적 테두리
                     CustomPaint(
                       painter: ScannerBorderPainter(
                         color: isDetected ? Colors.greenAccent : Colors.cyanAccent,
@@ -84,15 +88,12 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
             }),
           ),
 
-          // ------------------------------------------------
-          // 4. UI 텍스트 (위치 고정)
-          // ------------------------------------------------
+          // 4. UI 텍스트 및 버튼
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 30, horizontal: 20),
               child: Column(
                 children: [
-                  // [상단 영역] 타이틀 및 안내 문구
                   Column(
                     children: [
                       const Text(
@@ -119,65 +120,24 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
                     ],
                   ),
 
-                  const Spacer(), // 화면 중앙 공간 확보
+                  const Spacer(),
 
-                  // [하단 영역] 상태 메시지 박스 & 버튼
-                  Column(
-                    children: [
-                      Obx(() {
-                        bool isDetected = controller.isHelmetDetected.value;
-                        return Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 18),
-                          decoration: BoxDecoration(
-                            color: isDetected ? Colors.greenAccent.withOpacity(0.9) : Colors.black54,
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: isDetected ? Colors.green : Colors.white24,
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                isDetected ? Icons.verified_user : Icons.center_focus_weak,
-                                color: isDetected ? Colors.black : Colors.cyanAccent,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                isDetected ? "인증 성공! 이동합니다." : "헬멧 탐색 중...",
-                                style: TextStyle(
-                                  color: isDetected ? Colors.black : Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                            ],
-                          ),
-                        );
-                      }),
-                      
-                      const SizedBox(height: 16),
-
-                      // 강제 통과 버튼
-                      TextButton(
-                        onPressed: () {
-                          Get.off(() => const HomeScreen());
-                        },
-                        style: TextButton.styleFrom(
-                          foregroundColor: Colors.white38,
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text("Skip Test Mode", style: TextStyle(fontSize: 12)),
-                            SizedBox(width: 4),
-                            Icon(Icons.arrow_forward_ios, size: 10),
-                          ],
-                        ),
-                      ),
-                    ],
+                  // 강제 통과 버튼 (테스트용)
+                  TextButton(
+                    onPressed: () {
+                      Get.off(() => const HomeScreen());
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.white38,
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text("Skip Test Mode", style: TextStyle(fontSize: 12)),
+                        SizedBox(width: 4),
+                        Icon(Icons.arrow_forward_ios, size: 10),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -188,7 +148,6 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
     );
   }
 
-  // 배경 오버레이 (가운데 구멍 뚫기)
   Widget _buildDarkOverlay(double w, double h) {
     return ColorFiltered(
       colorFilter: const ColorFilter.mode(Colors.black54, BlendMode.srcOut),
@@ -206,7 +165,7 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
               height: h,
               decoration: BoxDecoration(
                 color: Colors.black,
-                borderRadius: BorderRadius.circular(20), // 둥근 모서리
+                borderRadius: BorderRadius.circular(20),
               ),
             ),
           ),
@@ -216,9 +175,6 @@ class _HelmetCheckScreenState extends State<HelmetCheckScreen> {
   }
 }
 
-// ------------------------------------------------
-// 프레임 페인터 (ㄱ, ㄴ 모양)
-// ------------------------------------------------
 class ScannerBorderPainter extends CustomPainter {
   final Color color;
   ScannerBorderPainter({required this.color});
@@ -229,33 +185,21 @@ class ScannerBorderPainter extends CustomPainter {
       ..color = color
       ..strokeWidth = 4
       ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.square; // 끝부분을 각지게
+      ..strokeCap = StrokeCap.square;
 
     double w = size.width;
     double h = size.height;
     double cornerSize = 40.0;
 
     Path path = Path();
-
-    // 왼쪽 위
-    path.moveTo(0, cornerSize);
-    path.lineTo(0, 0);
-    path.lineTo(cornerSize, 0);
-
-    // 오른쪽 위
-    path.moveTo(w - cornerSize, 0);
-    path.lineTo(w, 0);
-    path.lineTo(w, cornerSize);
-
-    // 오른쪽 아래
-    path.moveTo(w, h - cornerSize);
-    path.lineTo(w, h);
-    path.lineTo(w - cornerSize, h);
-
-    // 왼쪽 아래
-    path.moveTo(cornerSize, h);
-    path.lineTo(0, h);
-    path.lineTo(0, h - cornerSize);
+    // 좌상
+    path.moveTo(0, cornerSize); path.lineTo(0, 0); path.lineTo(cornerSize, 0);
+    // 우상
+    path.moveTo(w - cornerSize, 0); path.lineTo(w, 0); path.lineTo(w, cornerSize);
+    // 우하
+    path.moveTo(w, h - cornerSize); path.lineTo(w, h); path.lineTo(w - cornerSize, h);
+    // 좌하
+    path.moveTo(cornerSize, h); path.lineTo(0, h); path.lineTo(0, h - cornerSize);
 
     canvas.drawPath(path, paint);
   }

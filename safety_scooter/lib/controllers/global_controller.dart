@@ -1,7 +1,9 @@
 import 'dart:math';
 import 'package:camera/camera.dart';
+import 'package:flutter/material.dart'; // WidgetsBindingObserver용
 import 'package:get/get.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:permission_handler/permission_handler.dart'; // 권한 요청용
 import 'settings_controller.dart';
 import 'ride_controller.dart';
 import '../main.dart';
@@ -11,7 +13,7 @@ import '../services/helmet_service.dart';
 import '../services/api_service.dart';
 import '../services/sensor_service.dart'; 
 
-class GlobalController extends GetxController {
+class GlobalController extends GetxController with WidgetsBindingObserver {
   // --------------------------------------------------------
   // 1. 상태 변수들
   // --------------------------------------------------------
@@ -21,8 +23,6 @@ class GlobalController extends GetxController {
   
   // 배터리 잔량
   var batteryLevel = 100.obs;
-
-  
 
   // AI 사용 가능 여부
   RxBool isAiEnabled = true.obs;
@@ -42,6 +42,8 @@ class GlobalController extends GetxController {
   // [주행용] 모드 보관
   bool isRideMode = false;
 
+  // [추가] RideController 참조 (주행 상태 확인용)
+  RideController? _rideController;
   
 
 
@@ -88,13 +90,14 @@ class GlobalController extends GetxController {
   RxBool isCameraInitialized = false.obs;
 
   // 설정 컨트롤러 가져오기
-  final settings = Get.find<SettingsController>();
+  final settings = Get.put(SettingsController());
 
   
 
   @override
   void onInit() {
     super.onInit();
+    WidgetsBinding.instance.addObserver(this); // 앱 생명주기 감지 시작
     _notification.init();
 
     // [주행용] 서비스 생성
@@ -124,7 +127,27 @@ class GlobalController extends GetxController {
     aiHandler.closeModel();
     helmetService.closeModel();
     cameraController?.dispose();
+    WidgetsBinding.instance.removeObserver(this); // 감지 해제
     super.onClose();
+  }
+
+  // 앱이 백그라운드로 가거나 돌아올 때 처리
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (cameraController == null || !cameraController!.value.isInitialized) return;
+
+    if (state == AppLifecycleState.inactive) {
+      // 앱이 멈추면 카메라 해제 (메모리 누수 방지)
+      cameraController?.dispose();
+      isCameraInitialized.value = false;
+    } else if (state == AppLifecycleState.resumed) {
+      // 앱이 다시 켜지면 현재 모드에 맞춰 카메라 재시작
+      if (isHelmetCheckMode) {
+        startHelmetCheckMode();
+      } else if (isRideMode) {
+        startRideMode();
+      }
+    }
   }
 
   Future<void> startHelmetCheckMode() async {
@@ -137,11 +160,10 @@ class GlobalController extends GetxController {
     isAiEnabled.value = false;
     isHelmetDetected.value = false;
 
-    int cameraIndex = _getCameraIndex();
-
-    await _initCamera(cameraIndex, resolution: ResolutionPreset.high);
+    // [수정] 헬멧 체크는 전면 카메라 사용
+    int cameraIndex = _getCameraIndex(CameraLensDirection.front);
+    await _initCamera(cameraIndex, resolution: ResolutionPreset.medium);
     isAiEnabled.value = true;
-    
     
 
   }
@@ -167,28 +189,40 @@ class GlobalController extends GetxController {
     await aiHandler.loadModel(modelPath: path);
     isModelLoaded = true;
 
-    int cameraIndex = _getCameraIndex();
-
+    // [수정] 주행 모드는 후면 카메라 사용
+    int cameraIndex = _getCameraIndex(CameraLensDirection.back);
     await _initCamera(cameraIndex, resolution: ResolutionPreset.high);
-    isAiEnabled.value = true;
+    
+    // [수정] 주행 모드 진입 시 카메라는 켜지만, AI 추론은 '주행 시작' 버튼 누르기 전까지 대기
+    isAiEnabled.value = false;
 
   }
 
-  int _getCameraIndex() {
+  // [수정] 카메라 방향을 인자로 받아 인덱스 찾기
+  int _getCameraIndex(CameraLensDirection direction) {
     int cameraIndex = 0;
     try {
-      cameraIndex = cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
-      if (cameraIndex == 1) {
-        cameraIndex = 0;
-      } 
+      cameraIndex = cameras.indexWhere((c) => c.lensDirection == direction);
+      if (cameraIndex == -1) cameraIndex = 0;
     } catch (e) {
-        cameraIndex = 0;
+      cameraIndex = 0;
     }
     return cameraIndex;
   }
 
   Future<void> _initCamera(int cameraIndex, {ResolutionPreset resolution = ResolutionPreset.high}) async {
     if (cameras.isEmpty) return; 
+    
+    // [추가] 카메라 권한 확인 및 요청
+    var status = await Permission.camera.request();
+    if (!status.isGranted) {
+      print("❌ 카메라 권한 거부됨");
+      return;
+    }
+
+    // [수정] 카메라 교체 중임을 UI에 알림 (로딩 표시 및 기존 프리뷰 해제)
+    isCameraInitialized.value = false;
+
     if (cameraController != null) {
       await cameraController!.dispose();
       cameraController = null;
@@ -211,6 +245,11 @@ class GlobalController extends GetxController {
     } catch (e) {
       print("❌ 카메라 초기화 오류: $e");
     }
+  }
+
+  // [추가] RideController 설정 (HomeScreen에서 호출)
+  void setRideController(RideController controller) {
+    _rideController = controller;
   }
 
   // --------------------------------------------------------
@@ -255,11 +294,36 @@ class GlobalController extends GetxController {
   // 4. AI 이미지 처리 (카메라에서 호출)
   // --------------------------------------------------------
   Future<void> processCameraImage(CameraImage image) async {
-    // 모델 로딩 전이나 이미 분석 중이면 패스
-    if (_shouldSkipFrame()) return;
+    if (isDetecting) return;
+
+    // [추가] 헬멧 체크 모드 로직
+    if (isHelmetCheckMode) {
+      if (!helmetService.isLoaded) return;
+      isDetecting = true;
+      try {
+        bool result = await helmetService.detectHelmet(image);
+        isHelmetDetected.value = result;
+      } catch (e) {
+        print("Helmet check error: $e");
+      } finally {
+        isDetecting = false;
+      }
+      return;
+    }
+
+    // [기존] 주행 모드 로직
+    if (!isModelLoaded) return;
+
+    // [추가] 주행 중이 아니면 AI 추론 및 위험 감지 중단
+    if (_rideController == null || !_rideController!.isRiding.value) {
+      if (yoloResults.isNotEmpty) yoloResults.clear();
+      if (isDanger.value) isDanger.value = false;
+      if (_isObjectDetected) _isObjectDetected = false;
+      if (_isSpeeding) _isSpeeding = false;
+      return;
+    }
 
     isDetecting = true;
-
     // 이미지 크기 정보 업데이트 (박스 그리기용)
     camImageWidth.value = image.width.toDouble();
     camImageHeight.value = image.height.toDouble();
@@ -277,13 +341,6 @@ class GlobalController extends GetxController {
     } finally {
       isDetecting = false;
     }
-  }
-
-  /// 프레임 처리를 건너뛸지 결정
-  bool _shouldSkipFrame() {
-    if (isDetecting || !isModelLoaded) return true;
-    // (선택사항) 정지 중일 때 배터리 절약: if (!sensorService.isMoving.value) return true;
-    return false;
   }
 
   /// AI 결과에서 위험 요소(DANGER_HIT)가 있는지 확인
@@ -307,15 +364,16 @@ class GlobalController extends GetxController {
         double ratio = height / width;
 
         // 1. 종횡비 필터: 세로가 가로보다 1.25배 이상 길면 사람일 확률 높음 -> 무시
-        if (ratio > 1.25) {
-          continue; 
-        }
+        // [수정] 필터가 너무 엄격해서 인식이 안 되는 경우가 있어 주석 처리 (무조건 감지)
+        // if (ratio > 1.25) {
+        //   continue; 
+        // }
 
         // 2. 위치 필터: 박스 중심이 화면 상단 1/3 지점보다 위에 있으면(원경/하늘) 무시
         double centerY = y1 + (height / 2);
-        if (camImageHeight.value > 0 && centerY < (camImageHeight.value * 0.33)) {
-          continue; 
-        }
+        // if (camImageHeight.value > 0 && centerY < (camImageHeight.value * 0.33)) {
+        //   continue; 
+        // }
 
         print("🚨 포트홀(DANGER_HIT) 감지됨! [ID: ${obj['id']}] (Ratio: ${ratio.toStringAsFixed(2)})");
         return true;
