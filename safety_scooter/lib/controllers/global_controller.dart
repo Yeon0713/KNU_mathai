@@ -1,142 +1,224 @@
+import 'dart:async';
 import 'package:camera/camera.dart';
 import 'package:get/get.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../utils/notification_helper.dart';
 import '../services/ai_handler.dart';
-import '../services/sensor_service.dart'; 
+import '../services/helmet_service.dart';
+import '../services/sensor_service.dart';
+import 'ride_controller.dart'; 
+import '../main.dart'; 
 
 class GlobalController extends GetxController {
-  // --------------------------------------------------------
-  // 1. 상태 변수들
-  // --------------------------------------------------------
+  // 상태 변수
   var speed = "0.0 km/h".obs;
   var batteryLevel = 100.obs;
   
-  
+  RxBool isHelmetDetected = false.obs; 
+  RxBool isAiEnabled = true.obs; 
   var isDanger = false.obs; 
 
-  bool _isSpeeding = false;       // 속도 위반 여부 상태
-  bool _isObjectDetected = false; // 위험 객체 발견 여부 상태
+  // 카메라 관련
+  CameraController? cameraController; 
+  RxBool isCameraInitialized = false.obs;
+  
+  // AI 관련
+  var yoloResults = <Map<String, dynamic>>[].obs;
+  
+  // 이미지 크기 변수 (오류 방지용)
+  var camImageWidth = 0.0.obs; 
+  var camImageHeight = 0.0.obs;
 
-  // --------------------------------------------------------
-  // 2. 의존성 및 AI 관련 변수
-  // --------------------------------------------------------
+  late AiHandler aiHandler;         // 주행용 (Detection)
+  late HelmetService helmetService; // 헬멧용 (Classification)
+  
+  // 현재 어떤 모드인지 확인하는 플래그
+  bool isDashboardMode = false;
+
+  bool isDetecting = false;
+  bool _isSpeeding = false;
+  bool _isObjectDetected = false;
+
   final Battery _battery = Battery();
   final NotificationHelper _notification = NotificationHelper();
-  late AiHandler aiHandler;
-  
-  
   final SensorService sensorService = Get.put(SensorService()); 
-
-  var yoloResults = <Map<String, dynamic>>[].obs;
-  var camImageWidth = 0.0.obs;
-  var camImageHeight = 0.0.obs;
-  bool isDetecting = false;
-  bool isModelLoaded = false;
+  RideController? _rideController; 
 
   @override
   void onInit() {
     super.onInit();
     _notification.init();
-    aiHandler = AiHandler();
     
-    // AI 모델 로드
-    aiHandler.loadYoloModel().then((_) {
-      isModelLoaded = true;
-      print("✅ [Controller] 모델 로드 완료");
-    });
+    // 두 서비스 모두 생성
+    aiHandler = AiHandler();
+    helmetService = HelmetService();
 
     _initBatteryTracking();
     
-    // SensorService의 속도/움직임 상태를 감시
     ever(sensorService.displaySpeed, (String val) {
       speed.value = val;
-      
-      // 속도 파싱 (예: "35.0 km/h" -> 35.0)
       double currentSpeed = double.tryParse(val.split(' ')[0]) ?? 0.0;
-      
-      // 속도 위반 여부 업데이트 (30km/h 초과 시 위반)
       bool newSpeedStatus = (currentSpeed > 30.0);
-      
-      // 상태가 변했을 때만 로직 수행
       if (_isSpeeding != newSpeedStatus) {
         _isSpeeding = newSpeedStatus;
-        _checkTotalDanger(); // 상태가 변했으니 종합 판단 다시 수행
+        _checkTotalDanger();
       }
     });
   }
 
   @override
   void onClose() {
+    cameraController?.dispose();
     aiHandler.closeModel();
+    helmetService.close(); 
     super.onClose();
   }
 
   // --------------------------------------------------------
-  // 3. 종합 위험 판단 로직 (GPS + AI 결과 합치기)
+  // 모드 전환
   // --------------------------------------------------------
-  void _checkTotalDanger() {
-    // 둘 중 하나라도 위험하면 '위험'으로 간주
-    bool finalDangerStatus = _isSpeeding || _isObjectDetected;
 
-    // 상태가 '안전' -> '위험'으로 바뀔 때만 소리 재생 (중복 재생 방지)
-    if (finalDangerStatus && !isDanger.value) {
-      _notification.triggerWarning(0.25);
+  // [1] 헬멧 체크 모드
+  Future<void> startHelmetCheckMode() async {
+    isDashboardMode = false; 
+    isCameraInitialized.value = false;
+    isAiEnabled.value = false;
+    isHelmetDetected.value = false;
+
+    await helmetService.loadModel();
+    await aiHandler.closeModel();
+
+    int cameraIndex = 0;
+    try {
+      cameraIndex = cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.front);
+      if (cameraIndex == -1) cameraIndex = 0; 
+    } catch (e) {
+      cameraIndex = 0;
     }
     
-    // UI 업데이트 (화면 테두리 빨간색 등)
-    isDanger.value = finalDangerStatus;
+    await _initCamera(cameraIndex, resolution: ResolutionPreset.medium);
+    isAiEnabled.value = true;
+  }
+
+  // [2] 대시보드 모드
+  Future<void> startDashboardMode() async {
+    isDashboardMode = true; 
+    isCameraInitialized.value = false;
+    isAiEnabled.value = false;
+    yoloResults.clear();
+
+    helmetService.close();
+    await aiHandler.switchModel(toHelmetModel: false);
+
+    int cameraIndex = 0;
+    try {
+      cameraIndex = cameras.indexWhere((c) => c.lensDirection == CameraLensDirection.back);
+      if (cameraIndex == -1) cameraIndex = 0; 
+    } catch (e) {
+      cameraIndex = 0;
+    }
+
+    await _initCamera(cameraIndex, resolution: ResolutionPreset.high);
+    isAiEnabled.value = true;
+  }
+
+  Future<void> _initCamera(int cameraIndex, {ResolutionPreset resolution = ResolutionPreset.high}) async {
+    if (cameras.isEmpty) return; 
+    if (cameraController != null) {
+      await cameraController!.dispose();
+      cameraController = null;
+    }
+
+    final camera = cameras[cameraIndex]; 
+    cameraController = CameraController(
+      camera,
+      resolution,
+      enableAudio: false,
+      imageFormatGroup: ImageFormatGroup.yuv420, 
+    );
+
+    try {
+      await cameraController!.initialize();
+      await cameraController!.startImageStream((image) {
+        processCameraImage(image);
+      });
+      isCameraInitialized.value = true; 
+    } catch (e) {
+      print("❌ 카메라 초기화 오류: $e");
+    }
   }
 
   // --------------------------------------------------------
-  // 4. AI 이미지 처리 (카메라에서 호출)
+  // AI 이미지 처리 (수정된 핵심 로직)
   // --------------------------------------------------------
   Future<void> processCameraImage(CameraImage image) async {
-    // 모델 로딩 전이나 이미 분석 중이면 패스
-    if (isDetecting || !isModelLoaded) return;
-    
-    // (선택사항) 정지 중일 때 배터리 아끼려면 아래 주석 해제
-    // if (!sensorService.isMoving.value) return; 
-
+    if (isDetecting || !isAiEnabled.value) return;
     isDetecting = true;
 
-    // 이미지 크기 정보 업데이트 (박스 그리기용)
-    camImageWidth.value = image.width.toDouble();
-    camImageHeight.value = image.height.toDouble();
-
     try {
-      final results = await aiHandler.runInference(image);
-      yoloResults.value = results; // 결과 업데이트 (화면 박스 그리기용)
-
-      // 이번 프레임에서 위험 요소가 있는지 확인
-      bool dangerFoundThisFrame = false;
+      if (!isDashboardMode) {
+        // [헬멧 모드]
+        bool result = await helmetService.detectHelmet(image);
+        isHelmetDetected.value = result;
+        yoloResults.clear();
       
-      if (results.isNotEmpty) {
-        for (var obj in results) {
-          String tag = obj['tag']; 
-          
-          
-          if (tag == "DANGER_HIT") {
-            dangerFoundThisFrame = true;
-            print("🚨 위험 요소(DANGER_HIT) 감지됨!");
+      } else {
+        // [대시보드 모드]
+        
+        // ★ [수정] 주행 중이 아니면 '모든 위험 상태'를 초기화!
+        if (_rideController == null || !_rideController!.isRiding.value) {
+           yoloResults.clear(); 
+           
+           // 이 세 줄을 추가하여 빨간 화면을 즉시 끕니다.
+           isDanger.value = false;       
+           _isObjectDetected = false;
+           _isSpeeding = false;
+
+           return; // 함수 종료
+        }
+
+        // --- 주행 중일 때만 아래 로직 실행 ---
+        camImageWidth.value = image.width.toDouble();
+        camImageHeight.value = image.height.toDouble();
+        
+        final results = await aiHandler.runInference(image);
+        yoloResults.value = results; 
+
+        bool dangerFoundThisFrame = false;
+        if (results.isNotEmpty) {
+          for (var obj in results) {
+            String tag = obj['tag'];
+            if (tag == "person" || tag == "car" || tag == "truck" || tag == "DANGER_HIT") {
+               dangerFoundThisFrame = true; 
+            }
           }
         }
+        
+        // 상태가 변했을 때만 업데이트 (불필요한 연산 방지)
+        if (_isObjectDetected != dangerFoundThisFrame) {
+          _isObjectDetected = dangerFoundThisFrame;
+          _checkTotalDanger();
+        }
       }
-
-      // 상태가 바뀌었을 때만 업데이트 (성능 최적화)
-      if (_isObjectDetected != dangerFoundThisFrame) {
-        _isObjectDetected = dangerFoundThisFrame;
-        _checkTotalDanger(); // 종합 판단 요청
-      }
-
     } catch (e) {
-      print("Error in AI loop: $e");
+      print("AI Loop Error: $e");
     } finally {
       isDetecting = false;
     }
   }
 
-  // 배터리 관리
+  void setRideController(RideController controller) {
+    _rideController = controller;
+  }
+  
+  void _checkTotalDanger() {
+    bool finalDangerStatus = _isSpeeding || _isObjectDetected;
+    if (finalDangerStatus && !isDanger.value) {
+      _notification.triggerWarning(0.25);
+    }
+    isDanger.value = finalDangerStatus;
+  }
+  
   void _initBatteryTracking() {
     _updateBatteryLevel();
     _battery.onBatteryStateChanged.listen((BatteryState state) {
@@ -146,16 +228,5 @@ class GlobalController extends GetxController {
   void _updateBatteryLevel() async {
     final level = await _battery.batteryLevel;
     batteryLevel.value = level;
-  }
-  
-  // 시뮬레이션용 (디버깅)
-  void setDangerStatus(bool status) {
-    isDanger.value = status;
-  }
-  
-  void updateSpeed(double newSpeed) {
-    speed.value = "$newSpeed km/h";
-    _isSpeeding = newSpeed > 30;
-    _checkTotalDanger();
   }
 }
