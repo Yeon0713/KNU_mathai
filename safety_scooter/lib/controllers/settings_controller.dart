@@ -113,35 +113,62 @@ class SettingsController extends GetxController with WidgetsBindingObserver {
   }
 
   // assets/models 폴더 내의 .tflite 파일 목록을 불러옴
+  // Future<void> _loadModelList() async {
+  //   try {
+  //     final manifestContent = await rootBundle.loadString('AssetManifest.json');
+  //     final Map<String, dynamic> manifestMap = json.decode(manifestContent);
+
+  //     // assets/models/ 경로에 있는 .tflite 파일만 필터링
+  //     final models = manifestMap.keys
+  //         .where((key) => key.startsWith('assets/models/') && key.endsWith('.tflite'))
+  //         .map((key) => key.split('/').last) // 경로 제외하고 파일명만 추출
+  //         .toList();
+
+  //     if (models.isNotEmpty) {
+  //       modelOptions.assignAll(models);
+
+  //       // 현재 선택된 값이 목록에 없거나 레거시 값인 경우 처리
+  //       String current = selectedModel.value;
+  //       if (!models.contains(current)) {
+  //         if (current == "Fast (Nano)" && models.contains("model.tflite")) {
+  //           selectedModel.value = "model.tflite";
+  //         } else if (current == "Accurate (Small)" && models.contains("model_s.tflite")) {
+  //           selectedModel.value = "model_s.tflite";
+  //         } else {
+  //           selectedModel.value = models.first; // 목록의 첫 번째 파일로 대체
+  //         }
+  //         box.write('selectedModel', selectedModel.value);
+  //       }
+  //     }
+  //   } catch (e) {
+  //     print("❌ 모델 목록 로드 실패: $e");
+  //   }
+  // }
+  // assets/models 폴더 내의 .tflite 파일 목록을 불러옴 (수정됨)
   Future<void> _loadModelList() async {
     try {
-      final manifestContent = await rootBundle.loadString('AssetManifest.json');
-      final Map<String, dynamic> manifestMap = json.decode(manifestContent);
+      // [수정] 자동으로 찾지 말고, 사용할 파일명을 여기에 직접 적으세요.
+      // pubspec.yaml에 등록된 실제 파일명과 똑같아야 합니다.
+      List<String> manualModels = [
+        "beom_two_model.tflite", // ★ 지금 쓰고 계신 모델
+        "yolov8n.tflite",        // (필요하면 추가)
+        "model.tflite",          // (필요하면 추가)
+      ];
 
-      // assets/models/ 경로에 있는 .tflite 파일만 필터링
-      final models = manifestMap.keys
-          .where((key) => key.startsWith('assets/models/') && key.endsWith('.tflite'))
-          .map((key) => key.split('/').last) // 경로 제외하고 파일명만 추출
-          .toList();
+      modelOptions.assignAll(manualModels);
 
-      if (models.isNotEmpty) {
-        modelOptions.assignAll(models);
-
-        // 현재 선택된 값이 목록에 없거나 레거시 값인 경우 처리
-        String current = selectedModel.value;
-        if (!models.contains(current)) {
-          if (current == "Fast (Nano)" && models.contains("model.tflite")) {
-            selectedModel.value = "model.tflite";
-          } else if (current == "Accurate (Small)" && models.contains("model_s.tflite")) {
-            selectedModel.value = "model_s.tflite";
-          } else {
-            selectedModel.value = models.first; // 목록의 첫 번째 파일로 대체
-          }
+      // 선택된 모델이 목록에 없으면 첫 번째로 자동 설정
+      if (!manualModels.contains(selectedModel.value)) {
+        if (manualModels.isNotEmpty) {
+          selectedModel.value = manualModels.first;
           box.write('selectedModel', selectedModel.value);
         }
       }
+      
+      print("✅ 모델 목록 강제 설정 완료: $manualModels");
+
     } catch (e) {
-      print("❌ 모델 목록 로드 실패: $e");
+      print("❌ 모델 목록 설정 실패: $e");
     }
   }
 

@@ -12,7 +12,7 @@ class HelmetService {
     try {
       final options = InterpreterOptions();
       // 모델 파일명 정확한지 확인하세요
-      _interpreter = await Interpreter.fromAsset('assets/models/helmet_model.tflite', options: options);
+      _interpreter = await Interpreter.fromAsset('assets/models/beom_two_model.tflite', options: options);
       isLoaded = true;
       print("✅ HelmetService: 분류 모델 로드 완료");
     } catch (e) {
