@@ -38,10 +38,19 @@ Safety Scooter는 전동 킥보드(PM) 사용자의 안전을 위해 개발되�
 
 ### 사전 요구 사항 (Prerequisites)
 이 프로젝트를 실행하기 위해 필요한 소프트웨어입니다.
-* Flutter SDK 3.x 이상
-* Python 3.9 이상
+* Flutter SDK
+* Python
+* Android Studio
 
 ### 설치 (Installation)
 1. 레포지토리를 클론합니다.
    ```bash
    git clone [https://github.com/username/project-name.git](https://github.com/username/project-name.git)
+
+
+## 어플리케이션 실행
+* 실행 직후 헬멧 착용 감지에 통과하면 메인 화면으로 이동
+* 주행 준비를 마쳤을 때 주행 시작 버튼을 누름으로써 주행 시작
+* 주행 도중 UI를 통해 속도, 전방위 위험 요소를 탐지 [ YOLOv11 기반 실시간 위험 객체 탐지 ]
+* 탐지 된 객체는 서버로 넘어가 포트홀 여부를 재검증 하고, 승인 된 데이터는 카카오맵 지도상에 마커로 표시 [ 신고 시스템 구축 ]
+* 주행 종료 시 총 주행 시간 표기  
